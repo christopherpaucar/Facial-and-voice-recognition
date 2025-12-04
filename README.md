@@ -55,7 +55,7 @@ Sistema on-line de visión por computadora para el reconocimiento de rostros hum
 
 Si tienes el proyecto en un repositorio:
 ```bash
-git clone <url-del-repositorio>
+git clone https://github.com/christopherpaucar/Facial-and-voice-recognition.git
 cd "APE 4"
 ```
 

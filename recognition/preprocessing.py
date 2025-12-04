@@ -21,7 +21,7 @@ class ImagePreprocessor:
     
     def detect_face(self, image):
         """
-        Detecta un rostro en la imagen usando Haar Cascade
+        Detecta un rostro en la imagen usando Haar Cascade con múltiples intentos
         
         Args:
             image: Imagen en formato BGR (OpenCV)
@@ -30,17 +30,46 @@ class ImagePreprocessor:
             Tupla (x, y, w, h) con las coordenadas del rostro, o None si no se detecta
         """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        faces = self.face_cascade.detectMultiScale(
-            gray, 
-            scaleFactor=1.1, 
-            minNeighbors=5,
-            minSize=(30, 30)
-        )
         
-        if len(faces) > 0:
-            # Retornar el rostro más grande
-            faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
-            return faces[0]
+        # Mejorar contraste para mejor detección
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        gray_enhanced = clahe.apply(gray)
+        
+        # Intentar con diferentes configuraciones de parámetros
+        configs = [
+            {'scaleFactor': 1.1, 'minNeighbors': 3, 'minSize': (30, 30)},
+            {'scaleFactor': 1.05, 'minNeighbors': 2, 'minSize': (20, 20)},
+            {'scaleFactor': 1.03, 'minNeighbors': 1, 'minSize': (15, 15)},
+            {'scaleFactor': 1.1, 'minNeighbors': 2, 'minSize': (25, 25)},
+        ]
+        
+        for config in configs:
+            faces = self.face_cascade.detectMultiScale(
+                gray_enhanced,
+                scaleFactor=config['scaleFactor'],
+                minNeighbors=config['minNeighbors'],
+                minSize=config['minSize'],
+                flags=cv2.CASCADE_SCALE_IMAGE
+            )
+            
+            if len(faces) > 0:
+                # Retornar el rostro más grande
+                faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
+                return faces[0]
+        
+        # Si aún no se detecta, intentar con la imagen original sin mejora
+        for config in configs[:2]:  # Solo los primeros 2 configs
+            faces = self.face_cascade.detectMultiScale(
+                gray,
+                scaleFactor=config['scaleFactor'],
+                minNeighbors=config['minNeighbors'],
+                minSize=config['minSize']
+            )
+            
+            if len(faces) > 0:
+                faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
+                return faces[0]
+        
         return None
     
     def to_grayscale(self, image):
@@ -168,13 +197,43 @@ class ImagePreprocessor:
         
         return normalized
     
-    def preprocess_for_training(self, image_path, apply_filters=True):
+    def remove_background(self, image):
+        """
+        Elimina el fondo de la imagen usando segmentación basada en GrabCut
+        
+        Args:
+            image: Imagen en formato BGR
+            
+        Returns:
+            Imagen con fondo eliminado (fondo en negro)
+        """
+        # Crear máscara inicial (asumimos que el centro de la imagen es la persona)
+        mask = np.zeros(image.shape[:2], np.uint8)
+        bgdModel = np.zeros((1, 65), np.float64)
+        fgdModel = np.zeros((1, 65), np.float64)
+        
+        # Definir rectángulo inicial (centro de la imagen)
+        h, w = image.shape[:2]
+        rect = (int(w*0.1), int(h*0.1), int(w*0.8), int(h*0.8))
+        
+        try:
+            cv2.grabCut(image, mask, rect, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_RECT)
+            mask2 = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
+            result = image * mask2[:, :, np.newaxis]
+            return result
+        except:
+            # Si falla, retornar imagen original
+            return image
+    
+    def preprocess_for_training(self, image_path, apply_filters=True, fallback_no_face=True, remove_bg=False):
         """
         Preprocesa una imagen desde archivo para entrenamiento
         
         Args:
             image_path: Ruta a la imagen
             apply_filters: Si True, aplica filtros
+            fallback_no_face: Si True, procesa la imagen completa si no se detecta rostro
+            remove_bg: Si True, elimina el fondo antes de procesar
             
         Returns:
             Array numpy con la imagen preprocesada, o None si falla
@@ -183,7 +242,23 @@ class ImagePreprocessor:
         if image is None:
             return None
         
+        # Eliminar fondo si se solicita
+        if remove_bg:
+            image = self.remove_background(image)
+        
+        # Intentar detectar rostro primero
         processed = self.preprocess_pipeline(image, apply_filters=apply_filters, detect_face=True)
+        
+        # Si no se detecta rostro y fallback está activado, procesar la imagen completa
+        if processed is None and fallback_no_face:
+            # Redimensionar la imagen completa y procesarla
+            gray = self.to_grayscale(image)
+            if apply_filters:
+                gray = self.apply_bilateral_filter(gray)
+                gray = self.apply_histogram_equalization(gray)
+            resized = self.resize(gray)
+            processed = self.normalize(resized)
+        
         if processed is None:
             return None
         

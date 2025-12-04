@@ -58,14 +58,29 @@ class ModelTrainer:
             img_files = list(human_dir.glob('*.jpg')) + list(human_dir.glob('*.png')) + list(human_dir.glob('*.jpeg'))
             print(f"   Encontradas {len(img_files)} imágenes")
             for img_file in img_files:
-                processed = self.preprocessor.preprocess_for_training(str(img_file))
+                # Intentar primero con eliminación de fondo, luego sin ella
+                processed = self.preprocessor.preprocess_for_training(
+                    str(img_file), 
+                    apply_filters=True, 
+                    fallback_no_face=True,
+                    remove_bg=True  # Intentar eliminar fondo primero
+                )
+                # Si falla, intentar sin eliminar fondo
+                if processed is None:
+                    processed = self.preprocessor.preprocess_for_training(
+                        str(img_file), 
+                        apply_filters=True, 
+                        fallback_no_face=True,
+                        remove_bg=False
+                    )
+                
                 if processed is not None:
                     X.append(processed)
                     y.append(1)
                     human_loaded += 1
                 else:
                     human_failed += 1
-            print(f"   ✅ Cargadas: {human_loaded}, ❌ Sin rostro detectado: {human_failed}")
+            print(f"   ✅ Cargadas: {human_loaded}, ❌ Error al procesar: {human_failed}")
         else:
             print(f"⚠️ Carpeta 'human' no existe")
         

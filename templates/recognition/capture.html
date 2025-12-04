@@ -9,53 +9,68 @@
     <p>Al iniciar la cámara, se capturarán automáticamente 40 fotos para el dataset</p>
 </div>
 
-<div class="capture-container">
-    <div class="capture-card">
-        <h2>Vista de Cámara</h2>
-        <div class="camera-wrapper">
-            <video id="video" autoplay playsinline style="width: 100%; max-width: 640px; border-radius: 8px; background: #000;"></video>
-            <canvas id="canvas" style="display: none;"></canvas>
-        </div>
-        <div class="camera-controls">
-            <button id="startCamera" class="btn btn-primary btn-lg">🎥 Iniciar Cámara y Capturar 40 Fotos</button>
-            <button id="stopCamera" class="btn btn-secondary" style="display: none;">⏹️ Detener Cámara</button>
-        </div>
-        <div id="captureStatus" class="capture-status"></div>
-    </div>
-
-    <div class="capture-card">
-        <h2>Configuración</h2>
-        <div class="form-group">
-            <label for="label">Categoría:</label>
-            <select id="label" class="form-control">
-                <option value="human">Humano (Rostros humanos)</option>
-                <option value="non_human">No Humano (Objetos, animales, etc.)</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="photoCount">Número de fotos a capturar:</label>
-            <input type="number" id="photoCount" class="form-control" value="40" min="1" max="100">
-        </div>
-        <div class="form-group">
-            <label for="delay">Delay entre fotos (ms):</label>
-            <input type="number" id="delay" class="form-control" value="300" min="100" max="5000" step="50">
-            <small style="color: #666; font-size: 0.9rem;">300ms = ~3 fotos por segundo (recomendado)</small>
+<div class="capture-main-layout">
+    <!-- Columna izquierda: Instrucciones -->
+    <div class="capture-instructions-panel">
+        <div class="capture-card">
+            <h2>📋 Instrucciones</h2>
+            <ul class="instructions-list">
+                <li>✅ La cámara se activa automáticamente al cargar la página</li>
+                <li>✅ Permite el acceso a tu cámara cuando el navegador lo solicite</li>
+                <li>✅ Selecciona la categoría (Humano o No Humano)</li>
+                <li>✅ <strong>Acomódate frente a la cámara</strong> - Tienes tiempo para posicionarte</li>
+                <li>✅ Cuando estés listo, haz clic en <strong>"Iniciar Captura de 40 Fotos"</strong></li>
+                <li>📸 Para humanos: Asegúrate de que tu rostro sea claramente visible y frontal</li>
+                <li>📸 Para no humanos: Muestra objetos, animales o paisajes</li>
+                <li>⏱️ Las fotos se capturarán automáticamente con un delay de 300ms entre cada una</li>
+                <li>💾 Las fotos se guardan automáticamente en el dataset</li>
+                <li>⚙️ Puedes ajustar el número de fotos y el delay antes de iniciar</li>
+            </ul>
         </div>
     </div>
-</div>
 
-<div class="capture-info">
-    <h2>Instrucciones</h2>
-    <ul>
-        <li>Selecciona la categoría (Humano o No Humano)</li>
-        <li>Haz clic en "Iniciar Cámara y Capturar 40 Fotos"</li>
-        <li>Permite el acceso a tu cámara cuando el navegador lo solicite</li>
-        <li>Para humanos: Asegúrate de que tu rostro sea claramente visible</li>
-        <li>Para no humanos: Muestra objetos, animales o paisajes</li>
-        <li>Las 40 fotos se capturarán automáticamente con un delay de 300ms entre cada una</li>
-        <li>Las fotos se guardan automáticamente en el dataset</li>
-        <li>Puedes ajustar el número de fotos y el delay si lo deseas</li>
-    </ul>
+    <!-- Columna derecha: Vista de Cámara y Configuración -->
+    <div class="capture-camera-panel">
+        <!-- Vista de Cámara -->
+        <div class="capture-card">
+            <h2>📹 Vista de Cámara</h2>
+            <div class="camera-wrapper">
+                <video id="video" autoplay playsinline style="width: 100%; max-width: 100%; border-radius: 8px; background: #000; transform: scaleX(-1);"></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+            </div>
+            <div class="camera-controls">
+                <button id="startCapture" class="btn btn-primary btn-lg" style="display: none;">📸 Iniciar Captura de 40 Fotos</button>
+                <button id="stopCamera" class="btn btn-secondary" style="display: none;">⏹️ Detener Cámara</button>
+                <div id="cameraStatus" style="text-align: center; margin-top: 1rem; color: #666;">
+                    <p>🔄 Activando cámara...</p>
+                </div>
+            </div>
+            <div id="captureStatus" class="capture-status"></div>
+        </div>
+
+        <!-- Configuración: Debajo de la cámara -->
+        <div class="capture-card" style="margin-top: 2rem;">
+            <h2>⚙️ Configuración</h2>
+            <div class="config-grid">
+                <div class="form-group">
+                    <label for="label">Categoría:</label>
+                    <select id="label" class="form-control">
+                        <option value="human">Humano (Rostros humanos)</option>
+                        <option value="non_human">No Humano (Objetos, animales, etc.)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="photoCount">Número de fotos a capturar:</label>
+                    <input type="number" id="photoCount" class="form-control" value="40" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label for="delay">Delay entre fotos (ms):</label>
+                    <input type="number" id="delay" class="form-control" value="300" min="100" max="5000" step="50">
+                    <small style="color: #666; font-size: 0.9rem; display: block; margin-top: 0.25rem;">300ms = ~3 fotos por segundo (recomendado)</small>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 {% csrf_token %}
@@ -85,15 +100,9 @@ function getCookie(name) {
 
 const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
 
-// Iniciar cámara y capturar automáticamente
-document.getElementById('startCamera').addEventListener('click', async () => {
-    if (isCapturing) {
-        updateStatus('⏳ Ya se está capturando, por favor espera...', 'info');
-        return;
-    }
-
+// Activar cámara automáticamente al cargar la página
+async function activateCamera() {
     try {
-        // Iniciar cámara
         stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: 'user',
@@ -104,13 +113,43 @@ document.getElementById('startCamera').addEventListener('click', async () => {
         video.srcObject = stream;
         await video.play();
         
-        // Esperar un momento para que la cámara se estabilice
-        updateStatus('✅ Cámara activada. Preparando captura...', 'success');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Ocultar botón de inicio y mostrar botón de detener
-        document.getElementById('startCamera').style.display = 'none';
+        // Mostrar botón de captura y actualizar estado
+        document.getElementById('startCapture').style.display = 'inline-block';
         document.getElementById('stopCamera').style.display = 'inline-block';
+        document.getElementById('cameraStatus').innerHTML = '<p style="color: #28a745;">✅ Cámara activa - Acomódate y presiona "Iniciar Captura"</p>';
+        updateStatus('✅ Cámara activada. Acomódate y presiona "Iniciar Captura" cuando estés listo.', 'success');
+    } catch (error) {
+        document.getElementById('cameraStatus').innerHTML = '<p style="color: #dc3545;">❌ Error al acceder a la cámara</p>';
+        updateStatus('❌ Error al acceder a la cámara: ' + error.message, 'error');
+        console.error('Error accessing camera:', error);
+    }
+}
+
+// Activar cámara cuando se carga la página
+window.addEventListener('DOMContentLoaded', () => {
+    activateCamera();
+});
+
+// Iniciar captura de fotos
+document.getElementById('startCapture').addEventListener('click', async () => {
+    if (isCapturing) {
+        updateStatus('⏳ Ya se está capturando, por favor espera...', 'info');
+        return;
+    }
+
+    try {
+        // Verificar que la cámara esté activa
+        if (!stream || !video.srcObject) {
+            updateStatus('❌ La cámara no está activa. Por favor, recarga la página.', 'error');
+            return;
+        }
+        
+        // Esperar un momento para que el usuario se acomode
+        updateStatus('⏳ Preparando captura en 3 segundos...', 'info');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Ocultar botón de captura
+        document.getElementById('startCapture').style.display = 'none';
         
         // Obtener configuración
         const count = parseInt(document.getElementById('photoCount').value) || 40;
@@ -187,8 +226,9 @@ document.getElementById('stopCamera').addEventListener('click', () => {
         video.srcObject = null;
     }
     
-    document.getElementById('startCamera').style.display = 'inline-block';
+    document.getElementById('startCapture').style.display = 'none';
     document.getElementById('stopCamera').style.display = 'none';
+    document.getElementById('cameraStatus').innerHTML = '<p style="color: #666;">⏹️ Cámara detenida</p>';
     
     // Rehabilitar controles
     document.getElementById('photoCount').disabled = false;
@@ -211,8 +251,11 @@ async function captureAndSave(current, total, label) {
         canvas.width = video.videoWidth || 640;
         canvas.height = video.videoHeight || 480;
         
-        // Dibujar el frame actual del video en el canvas
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Reflejar horizontalmente el canvas para que coincida con la vista del video
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
         
         // Convertir a blob
         canvas.toBlob(async (blob) => {
@@ -269,26 +312,92 @@ window.addEventListener('beforeunload', () => {
 </script>
 
 <style>
-.capture-container {
+/* Layout principal: Dos columnas */
+.capture-main-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: 350px 1fr;
     gap: 2rem;
     margin-bottom: 2rem;
 }
 
+/* Panel de instrucciones (izquierda) */
+.capture-instructions-panel {
+    position: sticky;
+    top: 20px;
+    height: fit-content;
+}
+
+/* Panel de cámara (derecha) */
+.capture-camera-panel {
+    min-width: 0; /* Permite que se ajuste */
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+/* Cards */
+.capture-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+
+.capture-card h2 {
+    color: #667eea;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+}
+
+/* Lista de instrucciones */
+.instructions-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.instructions-list li {
+    padding: 1rem;
+    margin: 0.75rem 0;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 4px solid #667eea;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.instructions-list li:hover {
+    transform: translateX(5px);
+    box-shadow: 0 3px 10px rgba(102, 126, 234, 0.2);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+}
+
+/* Camera wrapper */
 .camera-wrapper {
     text-align: center;
     margin: 1rem 0;
     padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 8px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.camera-wrapper video {
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
 }
 
 .camera-controls {
     display: flex;
     gap: 1rem;
     justify-content: center;
-    margin-top: 1rem;
+    margin-top: 1.5rem;
     flex-wrap: wrap;
 }
 
@@ -322,29 +431,63 @@ window.addEventListener('beforeunload', () => {
     border: 1px solid #bee5eb;
 }
 
-.capture-info {
-    background: white;
-    padding: 2rem;
-    border-radius: 15px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-    margin-top: 2rem;
+/* Form groups en configuración */
+.config-grid .form-group {
+    margin-bottom: 0;
 }
 
-.capture-info ul {
-    list-style: none;
-    padding-left: 0;
-}
-
-.capture-info li {
-    padding: 0.75rem;
-    border-left: 4px solid #667eea;
-    margin: 0.5rem 0;
-    background: #f8f9fa;
-}
-
-.form-group small {
+.config-grid .form-group label {
     display: block;
-    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.config-grid .form-group .form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.config-grid .form-group .form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .capture-main-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .capture-instructions-panel {
+        position: relative;
+        top: 0;
+    }
+    
+    .config-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .capture-card {
+        padding: 1.5rem;
+    }
+    
+    .camera-wrapper {
+        padding: 0.5rem;
+    }
+    
+    .instructions-list li {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
 }
 </style>
 {% endblock %}
