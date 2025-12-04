@@ -66,15 +66,21 @@ class FacePredictor:
                 'label': 'Humano' o 'No Humano'
             }
         """
-        # Preprocesar imagen
-        processed = self.preprocessor.preprocess_for_training(image_path)
+        # Preprocesar imagen: intentar detectar rostro, pero si falla procesar imagen completa
+        # Esto permite que funcione tanto para imágenes humanas como no humanas
+        processed = self.preprocessor.preprocess_for_training(
+            image_path,
+            apply_filters=True,
+            detect_face=True,  # Intentar detectar rostro primero
+            remove_bg=False
+        )
         
         if processed is None:
             return {
                 'prediction': None,
                 'confidence': 0.0,
-                'label': 'Error: No se detectó rostro en la imagen',
-                'error': 'No se detectó rostro'
+                'label': 'Error: No se pudo procesar la imagen',
+                'error': 'Error al procesar imagen'
             }
         
         # Realizar predicción según el modelo
@@ -93,15 +99,20 @@ class FacePredictor:
         Returns:
             dict: Resultado de la predicción
         """
-        # Preprocesar
-        processed = self.preprocessor.preprocess_pipeline(image_array)
+        # Preprocesar: intentar detectar rostro, pero si falla procesar imagen completa
+        processed = self.preprocessor.preprocess_pipeline(
+            image_array,
+            apply_filters=True,
+            detect_face=True,  # Intentar detectar rostro primero
+            allow_no_face=True  # Si no detecta rostro, procesar imagen completa
+        )
         
         if processed is None:
             return {
                 'prediction': None,
                 'confidence': 0.0,
-                'label': 'Error: No se detectó rostro en la imagen',
-                'error': 'No se detectó rostro'
+                'label': 'Error: No se pudo procesar la imagen',
+                'error': 'Error al procesar imagen'
             }
         
         # Aplanar

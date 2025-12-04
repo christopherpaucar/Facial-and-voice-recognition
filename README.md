@@ -4,6 +4,65 @@ Sistema on-line de visión por computadora para el reconocimiento de rostros hum
 
 ---
 
+## ⚡ INICIO RÁPIDO - Ejecutar el Proyecto
+
+### 🎯 Método Más Fácil (Windows)
+
+1. **Abre PowerShell o CMD** en la carpeta `APE 4`
+2. **Ejecuta uno de estos scripts**:
+   - **PowerShell**: `.\iniciar_servidor.ps1`
+   - **CMD**: `iniciar_servidor.bat`
+3. **Abre tu navegador** en: **http://localhost:8000**
+
+✅ **¡Listo!** El servidor se iniciará automáticamente.
+
+---
+
+### 📋 Método Manual (Paso a Paso)
+
+#### **Paso 1: Activar Entorno Virtual**
+
+**Windows (PowerShell):**
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+**Windows (CMD):**
+```cmd
+venv\Scripts\activate.bat
+```
+
+✅ **Verificación**: Deberías ver `(venv)` al inicio de tu línea de comandos.
+
+#### **Paso 2: Iniciar el Servidor**
+
+```bash
+python manage.py runserver
+```
+
+✅ **¡Listo!** El servidor estará disponible en: **http://localhost:8000**
+
+> **💡 Tip**: Si el puerto 8000 está ocupado, usa: `python manage.py runserver 8001`
+
+#### **Paso 3: Detener el Servidor**
+
+Presiona **Ctrl + C** en la terminal.
+
+---
+
+### 📍 URLs Importantes
+
+Una vez que el servidor esté corriendo:
+
+- 🏠 **Página Principal**: http://localhost:8000/
+- 📸 **Capturar Imágenes**: http://localhost:8000/capture/
+- 📊 **Ver Dataset**: http://localhost:8000/dataset/
+- 🎓 **Entrenar Modelo**: http://localhost:8000/train/
+- 🔍 **Hacer Predicción**: http://localhost:8000/predict/
+- 📜 **Ver Historial**: http://localhost:8000/history/
+
+---
+
 ## 📋 Tabla de Contenidos
 
 - [Características](#-características)
@@ -49,7 +108,98 @@ Sistema on-line de visión por computadora para el reconocimiento de rostros hum
 
 ---
 
-## 🚀 Instalación
+## 🚀 INICIO RÁPIDO - Ejecutar el Proyecto
+
+### ⚡ Método Rápido (Windows - Recomendado)
+
+**Opción 1: Usar Script Automático (Más Fácil)**
+
+1. **Abre PowerShell** en la carpeta del proyecto `APE 4`
+2. **Ejecuta el script**:
+   ```powershell
+   .\iniciar_servidor.ps1
+   ```
+   
+   O si usas CMD:
+   ```cmd
+   iniciar_servidor.bat
+   ```
+
+¡Listo! El servidor se iniciará automáticamente en **http://localhost:8000**
+
+---
+
+### 📋 Método Manual (Paso a Paso)
+
+#### **Paso 1: Abrir Terminal en la Carpeta del Proyecto**
+
+Navega a la carpeta `APE 4`:
+```bash
+cd "APE 4"
+```
+
+#### **Paso 2: Activar Entorno Virtual**
+
+**Windows (PowerShell):**
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+Si aparece un error de política de ejecución, ejecuta primero:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**Windows (CMD):**
+```cmd
+venv\Scripts\activate.bat
+```
+
+**Linux/Mac:**
+```bash
+source venv/bin/activate
+```
+
+✅ **Verificación**: Deberías ver `(venv)` al inicio de tu línea de comandos.
+
+#### **Paso 3: Verificar que las Dependencias Estén Instaladas**
+
+```bash
+python manage.py check
+```
+
+Si aparece un error como `No module named 'django'`, instala las dependencias:
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+⏱️ **Tiempo estimado**: 5-15 minutos (solo la primera vez)
+
+#### **Paso 4: Configurar Base de Datos (Solo Primera Vez)**
+
+```bash
+python manage.py migrate
+```
+
+Esto crea las tablas necesarias en la base de datos SQLite.
+
+#### **Paso 5: Iniciar el Servidor**
+
+```bash
+python manage.py runserver
+```
+
+✅ **¡Listo!** El servidor estará disponible en: **http://localhost:8000**
+
+> **💡 Tip**: Si el puerto 8000 está ocupado, usa otro puerto:
+> ```bash
+> python manage.py runserver 8001
+> ```
+
+---
+
+## 🚀 Instalación Completa (Primera Vez)
 
 ### Paso 1: Clonar o Descargar el Proyecto
 
@@ -111,11 +261,7 @@ Si todo está correcto, verás:
 System check identified no issues (0 silenced).
 ```
 
----
-
-## ⚙️ Configuración Inicial
-
-### Paso 1: Configurar Base de Datos
+### Paso 5: Configurar Base de Datos
 
 ```bash
 python manage.py migrate
@@ -123,17 +269,7 @@ python manage.py migrate
 
 Esto creará las tablas necesarias en la base de datos SQLite.
 
-### Paso 2: Crear Superusuario (Opcional)
-
-Para acceder al panel de administración de Django:
-
-```bash
-python manage.py createsuperuser
-```
-
-Sigue las instrucciones para crear un usuario administrador.
-
-### Paso 3: Crear Carpetas del Dataset
+### Paso 6: Crear Carpetas del Dataset (Opcional)
 
 Las carpetas se crean automáticamente, pero puedes verificarlas:
 
@@ -146,7 +282,7 @@ New-Item -ItemType Directory -Path "dataset\non_human" -Force
 mkdir -p dataset/human dataset/non_human
 ```
 
-### Paso 4: Iniciar el Servidor
+### Paso 7: Iniciar el Servidor
 
 ```bash
 python manage.py runserver
@@ -546,9 +682,38 @@ Desarrollado como proyecto académico para el reconocimiento de rostros humanos 
 
 **¡Listo para usar! 🚀**
 
-Para comenzar, ejecuta:
+---
+
+## 🎯 Resumen de Ejecución Rápida
+
+### Para ejecutar el proyecto:
+
+1. **Abre PowerShell/CMD** en la carpeta `APE 4`
+2. **Ejecuta**: `.\iniciar_servidor.ps1` (PowerShell) o `iniciar_servidor.bat` (CMD)
+3. **Abre tu navegador** en: **http://localhost:8000**
+
+### O manualmente:
+
 ```bash
+# 1. Activar entorno virtual
+.\venv\Scripts\Activate.ps1
+
+# 2. Iniciar servidor
 python manage.py runserver
 ```
 
-Y visita: **http://localhost:8000**
+### Para detener el servidor:
+Presiona **Ctrl + C** en la terminal
+
+---
+
+## 📍 URLs Importantes
+
+Una vez que el servidor esté corriendo, puedes acceder a:
+
+- 🏠 **Página Principal**: http://localhost:8000/
+- 📸 **Capturar Imágenes**: http://localhost:8000/capture/
+- 📊 **Ver Dataset**: http://localhost:8000/dataset/
+- 🎓 **Entrenar Modelo**: http://localhost:8000/train/
+- 🔍 **Hacer Predicción**: http://localhost:8000/predict/
+- 📜 **Ver Historial**: http://localhost:8000/history/

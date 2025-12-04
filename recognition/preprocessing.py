@@ -259,60 +259,72 @@ class ImagePreprocessor:
             # Si falla, retornar imagen original
             return image
     
-    def preprocess_for_training(self, image_path, apply_filters=True, fallback_no_face=True, remove_bg=False):
+    def preprocess_for_training(self, image_path, apply_filters=True, detect_face=False, remove_bg=False):
         """
         Preprocesa una imagen desde archivo para entrenamiento
         
         Args:
             image_path: Ruta a la imagen
             apply_filters: Si True, aplica filtros
-            fallback_no_face: Si True, procesa la imagen completa si no se detecta rostro
+            detect_face: Si True, intenta detectar y recortar rostro (solo para humanos)
             remove_bg: Si True, elimina el fondo antes de procesar
             
         Returns:
             Array numpy con la imagen preprocesada, o None si falla
         """
         try:
-            image = cv2.imread(image_path)
+            image = cv2.imread(str(image_path))
             if image is None:
+                return None
+            if image.size == 0:
                 return None
             
             # Eliminar fondo si se solicita
             if remove_bg:
                 try:
                     image = self.remove_background(image)
-                except:
+                except Exception:
                     pass  # Continuar sin eliminar fondo si falla
             
-            # Intentar detectar rostro primero (con allow_no_face si fallback está activado)
-            try:
-                processed = self.preprocess_pipeline(
-                    image, 
-                    apply_filters=apply_filters, 
-                    detect_face=True,
-                    allow_no_face=fallback_no_face
-                )
-            except Exception as e:
-                # Si falla el pipeline, usar fallback
-                processed = None
-            
-            # Si aún no se procesó y fallback está activado, procesar la imagen completa
-            if processed is None and fallback_no_face:
+            # Intentar detectar rostro si se solicita (solo para humanos)
+            if detect_face:
                 try:
-                    # Redimensionar la imagen completa y procesarla
-                    gray = self.to_grayscale(image)
-                    if apply_filters:
-                        try:
-                            gray = self.apply_bilateral_filter(gray)
-                            gray = self.apply_histogram_equalization(gray)
-                        except:
-                            pass  # Continuar sin filtros si fallan
-                    resized = self.resize(gray)
-                    processed = self.normalize(resized)
-                except Exception as e:
-                    return None
+                    face_coords = self.detect_face(image)
+                    if face_coords is not None:
+                        x, y, w, h = face_coords
+                        # Recortar el rostro con un margen
+                        margin = 20
+                        x = max(0, x - margin)
+                        y = max(0, y - margin)
+                        w = min(image.shape[1] - x, w + 2 * margin)
+                        h = min(image.shape[0] - y, h + 2 * margin)
+                        image = image[y:y+h, x:x+w]
+                        if image.size == 0:
+                            return None
+                except Exception:
+                    # Si falla la detección, continuar con la imagen completa
+                    pass
+            
+            # Procesar la imagen (con o sin rostro detectado)
+            # Convertir a escala de grises
+            gray = self.to_grayscale(image)
+            
+            if apply_filters:
+                try:
+                    gray = self.apply_bilateral_filter(gray)
+                    gray = self.apply_histogram_equalization(gray)
+                except Exception:
+                    pass  # Continuar sin filtros si fallan
+            
+            # Redimensionar
+            resized = self.resize(gray)
+            
+            # Normalizar
+            processed = self.normalize(resized)
             
             if processed is None:
+                return None
+            if processed.size == 0:
                 return None
             
             # Aplanar para el modelo

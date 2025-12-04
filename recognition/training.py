@@ -58,12 +58,12 @@ class ModelTrainer:
             img_files = list(human_dir.glob('*.jpg')) + list(human_dir.glob('*.png')) + list(human_dir.glob('*.jpeg'))
             print(f"   Encontradas {len(img_files)} imágenes")
             for img_file in img_files:
-                # Procesar imagen (siempre con fallback activado)
+                # Procesar imagen humana: intentar detectar rostro, pero si falla procesar imagen completa
                 processed = self.preprocessor.preprocess_for_training(
                     str(img_file), 
                     apply_filters=True, 
-                    fallback_no_face=True,  # SIEMPRE procesar aunque no detecte rostro
-                    remove_bg=False  # No eliminar fondo por defecto (más rápido y confiable)
+                    detect_face=True,  # Intentar detectar rostro
+                    remove_bg=False
                 )
                 
                 if processed is not None:
@@ -85,20 +85,18 @@ class ModelTrainer:
             img_files = list(non_human_dir.glob('*.jpg')) + list(non_human_dir.glob('*.png')) + list(non_human_dir.glob('*.jpeg'))
             print(f"   Encontradas {len(img_files)} imágenes")
             for img_file in img_files:
-                # Para non_human, no detectamos rostro, solo preprocesamos la imagen completa
-                image = cv2.imread(str(img_file))
-                if image is not None:
-                    processed = self.preprocessor.preprocess_pipeline(
-                        image, 
-                        apply_filters=True, 
-                        detect_face=False  # NO detectar rostro para non_human
-                    )
-                    if processed is not None:
-                        X.append(processed.flatten())
-                        y.append(0)
-                        non_human_loaded += 1
-                    else:
-                        non_human_failed += 1
+                # Procesar imagen no humana: NO detectar rostros, procesar imagen completa directamente
+                processed = self.preprocessor.preprocess_for_training(
+                    str(img_file), 
+                    apply_filters=True, 
+                    detect_face=False,  # NO detectar rostros para objetos
+                    remove_bg=False
+                )
+                
+                if processed is not None:
+                    X.append(processed)
+                    y.append(0)
+                    non_human_loaded += 1
                 else:
                     non_human_failed += 1
             print(f"   ✅ Cargadas: {non_human_loaded}, ❌ Error al procesar: {non_human_failed}")
