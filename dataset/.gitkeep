@@ -1,0 +1,5 @@
+# Este archivo mantiene el directorio dataset en git
+# Coloca tus imágenes aquí:
+# - dataset/human/ (imágenes con rostros humanos)
+# - dataset/non_human/ (imágenes sin rostros humanos)
+

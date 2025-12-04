@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Inicio - Sistema de Reconocimiento{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Bienvenido al Sistema de Reconocimiento de Rostros</h1>
+    <p class="lead">Sistema de reconocimiento de personas on-line utilizando inteligencia artificial</p>
+    <p>Este sistema utiliza <strong>PCA</strong>, <strong>SVM</strong> y <strong>TensorFlow</strong> para clasificar imágenes como rostros humanos o no humanos.</p>
+</div>
+
+<div class="features">
+    <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h3>Reconocimiento en Tiempo Real</h3>
+        <p>Sube una imagen y obtén una predicción instantánea sobre si contiene un rostro humano o no.</p>
+        <a href="{% url 'predict' %}" class="btn btn-primary">Probar Ahora</a>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <h3>Múltiples Modelos</h3>
+        <p>Utiliza PCA+SVM o TensorFlow para realizar las predicciones. Ambos modelos están disponibles.</p>
+        <a href="{% url 'train' %}" class="btn btn-secondary">Entrenar Modelo</a>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Preprocesamiento Avanzado</h3>
+        <p>Las imágenes se procesan con filtros Gaussianos, ecualización de histograma y más.</p>
+        <a href="{% url 'dataset' %}" class="btn btn-info">Gestionar Dataset</a>
+    </div>
+</div>
+
+<div class="info-section">
+    <h2>Características del Sistema</h2>
+    <ul class="info-list">
+        <li>✅ Preprocesamiento de imágenes (escala de grises, filtros)</li>
+        <li>✅ Detección automática de rostros usando Haar Cascade</li>
+        <li>✅ Reducción de dimensionalidad con PCA</li>
+        <li>✅ Clasificación con SVM (Support Vector Machine)</li>
+        <li>✅ Modelo de red neuronal con TensorFlow/Keras</li>
+        <li>✅ Interfaz web intuitiva para pruebas en línea</li>
+        <li>✅ Historial de predicciones y entrenamientos</li>
+    </ul>
+</div>
+{% endblock %}
+

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Reconocimiento de Rostros{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="navbar-brand">🤖 Sistema de Reconocimiento de Rostros</h1>
+            <ul class="navbar-nav">
+                <li><a href="{% url 'index' %}">Inicio</a></li>
+                <li><a href="{% url 'predict' %}">Probar Modelo</a></li>
+                <li><a href="{% url 'train' %}">Entrenar</a></li>
+                <li><a href="{% url 'dataset' %}">Dataset</a></li>
+                <li><a href="{% url 'capture' %}">📸 Capturar</a></li>
+                <li><a href="{% url 'history' %}">Historial</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% csrf_token %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Sistema de Reconocimiento de Rostros - IA</p>
+        </div>
+    </footer>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

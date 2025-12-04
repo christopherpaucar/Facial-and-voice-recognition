@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Capturar desde Cámara - Sistema de Reconocimiento{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📸 Capturar Fotos desde la Cámara</h1>
+    <p>Al iniciar la cámara, se capturarán automáticamente 40 fotos para el dataset</p>
+</div>
+
+<div class="capture-container">
+    <div class="capture-card">
+        <h2>Vista de Cámara</h2>
+        <div class="camera-wrapper">
+            <video id="video" autoplay playsinline style="width: 100%; max-width: 640px; border-radius: 8px; background: #000;"></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+        <div class="camera-controls">
+            <button id="startCamera" class="btn btn-primary btn-lg">🎥 Iniciar Cámara y Capturar 40 Fotos</button>
+            <button id="stopCamera" class="btn btn-secondary" style="display: none;">⏹️ Detener Cámara</button>
+        </div>
+        <div id="captureStatus" class="capture-status"></div>
+    </div>
+
+    <div class="capture-card">
+        <h2>Configuración</h2>
+        <div class="form-group">
+            <label for="label">Categoría:</label>
+            <select id="label" class="form-control">
+                <option value="human">Humano (Rostros humanos)</option>
+                <option value="non_human">No Humano (Objetos, animales, etc.)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="photoCount">Número de fotos a capturar:</label>
+            <input type="number" id="photoCount" class="form-control" value="40" min="1" max="100">
+        </div>
+        <div class="form-group">
+            <label for="delay">Delay entre fotos (ms):</label>
+            <input type="number" id="delay" class="form-control" value="300" min="100" max="5000" step="50">
+            <small style="color: #666; font-size: 0.9rem;">300ms = ~3 fotos por segundo (recomendado)</small>
+        </div>
+    </div>
+</div>
+
+<div class="capture-info">
+    <h2>Instrucciones</h2>
+    <ul>
+        <li>Selecciona la categoría (Humano o No Humano)</li>
+        <li>Haz clic en "Iniciar Cámara y Capturar 40 Fotos"</li>
+        <li>Permite el acceso a tu cámara cuando el navegador lo solicite</li>
+        <li>Para humanos: Asegúrate de que tu rostro sea claramente visible</li>
+        <li>Para no humanos: Muestra objetos, animales o paisajes</li>
+        <li>Las 40 fotos se capturarán automáticamente con un delay de 300ms entre cada una</li>
+        <li>Las fotos se guardan automáticamente en el dataset</li>
+        <li>Puedes ajustar el número de fotos y el delay si lo deseas</li>
+    </ul>
+</div>
+
+{% csrf_token %}
+
+<script>
+let stream = null;
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+let isCapturing = false;
+
+// Obtener token CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+// Iniciar cámara y capturar automáticamente
+document.getElementById('startCamera').addEventListener('click', async () => {
+    if (isCapturing) {
+        updateStatus('⏳ Ya se está capturando, por favor espera...', 'info');
+        return;
+    }
+
+    try {
+        // Iniciar cámara
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'user',
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            } 
+        });
+        video.srcObject = stream;
+        await video.play();
+        
+        // Esperar un momento para que la cámara se estabilice
+        updateStatus('✅ Cámara activada. Preparando captura...', 'success');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Ocultar botón de inicio y mostrar botón de detener
+        document.getElementById('startCamera').style.display = 'none';
+        document.getElementById('stopCamera').style.display = 'inline-block';
+        
+        // Obtener configuración
+        const count = parseInt(document.getElementById('photoCount').value) || 40;
+        const delay = parseInt(document.getElementById('delay').value) || 300;
+        const label = document.getElementById('label').value;
+        
+        // Deshabilitar controles durante la captura
+        document.getElementById('photoCount').disabled = true;
+        document.getElementById('delay').disabled = true;
+        document.getElementById('label').disabled = true;
+        
+        isCapturing = true;
+        updateStatus(`📸 Capturando ${count} fotos automáticamente...`, 'info');
+        
+        // Capturar todas las fotos
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (let i = 0; i < count; i++) {
+            if (!isCapturing) {
+                updateStatus('⏹️ Captura cancelada', 'info');
+                break;
+            }
+            
+            try {
+                await captureAndSave(i + 1, count, label);
+                successCount++;
+                updateStatus(`📸 Foto ${i + 1}/${count} capturada y guardada`, 'success');
+            } catch (error) {
+                errorCount++;
+                console.error('Error capturando foto:', error);
+                updateStatus(`⚠️ Error en foto ${i + 1}/${count}: ${error.message}`, 'error');
+            }
+            
+            // Esperar antes de la siguiente foto (excepto la última)
+            if (i < count - 1 && isCapturing) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        
+        isCapturing = false;
+        
+        // Rehabilitar controles
+        document.getElementById('photoCount').disabled = false;
+        document.getElementById('delay').disabled = false;
+        document.getElementById('label').disabled = false;
+        
+        // Mostrar resultado final
+        if (successCount > 0) {
+            updateStatus(`✅ Captura completada: ${successCount} fotos guardadas exitosamente${errorCount > 0 ? `, ${errorCount} errores` : ''}`, 'success');
+        } else {
+            updateStatus(`❌ No se pudo capturar ninguna foto`, 'error');
+        }
+        
+    } catch (error) {
+        isCapturing = false;
+        updateStatus('❌ Error al acceder a la cámara: ' + error.message, 'error');
+        console.error('Error accessing camera:', error);
+        
+        // Rehabilitar controles en caso de error
+        document.getElementById('photoCount').disabled = false;
+        document.getElementById('delay').disabled = false;
+        document.getElementById('label').disabled = false;
+    }
+});
+
+// Detener cámara
+document.getElementById('stopCamera').addEventListener('click', () => {
+    isCapturing = false;
+    
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        video.srcObject = null;
+    }
+    
+    document.getElementById('startCamera').style.display = 'inline-block';
+    document.getElementById('stopCamera').style.display = 'none';
+    
+    // Rehabilitar controles
+    document.getElementById('photoCount').disabled = false;
+    document.getElementById('delay').disabled = false;
+    document.getElementById('label').disabled = false;
+    
+    updateStatus('⏹️ Cámara detenida', 'info');
+});
+
+// Función para capturar y guardar
+async function captureAndSave(current, total, label) {
+    return new Promise((resolve, reject) => {
+        // Esperar a que el video esté listo
+        if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+            reject(new Error('Video no está listo'));
+            return;
+        }
+        
+        // Configurar canvas con las dimensiones del video
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        
+        // Dibujar el frame actual del video en el canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convertir a blob
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                reject(new Error('No se pudo crear la imagen'));
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('image', blob, 'capture_' + Date.now() + '_' + current + '.jpg');
+            formData.append('label', label);
+            
+            try {
+                const response = await fetch('{% url "upload_dataset" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resolve(data);
+                } else {
+                    reject(new Error(data.error || 'No se pudo guardar la foto'));
+                }
+            } catch (error) {
+                reject(error);
+            }
+        }, 'image/jpeg', 0.95);
+    });
+}
+
+// Función para actualizar el estado
+function updateStatus(message, type = 'info') {
+    const statusDiv = document.getElementById('captureStatus');
+    statusDiv.textContent = message;
+    statusDiv.className = 'capture-status ' + type;
+}
+
+// Limpiar al salir
+window.addEventListener('beforeunload', () => {
+    isCapturing = false;
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+});
+</script>
+
+<style>
+.capture-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.camera-wrapper {
+    text-align: center;
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.camera-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.capture-status {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.capture-status.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.capture-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.capture-status.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.capture-info {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+    margin-top: 2rem;
+}
+
+.capture-info ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.capture-info li {
+    padding: 0.75rem;
+    border-left: 4px solid #667eea;
+    margin: 0.5rem 0;
+    background: #f8f9fa;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.25rem;
+}
+</style>
+{% endblock %}

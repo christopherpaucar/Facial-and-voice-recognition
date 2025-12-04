@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Entrenar Modelo - Sistema de Reconocimiento{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🧠 Entrenar Modelo</h1>
+    <p>Entrena los modelos PCA+SVM y TensorFlow con tu dataset</p>
+</div>
+
+<div class="train-container">
+    <div class="train-card">
+        <h2>Configuración de Entrenamiento</h2>
+        <form id="trainForm">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="use_pca_svm" checked>
+                    Entrenar modelo PCA + SVM
+                </label>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="use_tensorflow" checked>
+                    Entrenar modelo TensorFlow
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg">🚀 Iniciar Entrenamiento</button>
+        </form>
+    </div>
+
+    <div class="train-card">
+        <h2>Estado del Entrenamiento</h2>
+        <div id="trainStatus" class="train-status">
+            <p class="placeholder">El estado del entrenamiento aparecerá aquí</p>
+        </div>
+    </div>
+</div>
+
+<div class="recent-trainings">
+    <h2>Historial de Entrenamientos</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Accuracy</th>
+                <th>Total Muestras</th>
+                <th>Humanos</th>
+                <th>No Humanos</th>
+                <th>Notas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for training in recent_trainings %}
+            <tr>
+                <td>{{ training.created_at|date:"d/m/Y H:i" }}</td>
+                <td>{{ training.accuracy|floatformat:2 }}%</td>
+                <td>{{ training.total_samples }}</td>
+                <td>{{ training.human_samples }}</td>
+                <td>{{ training.non_human_samples }}</td>
+                <td>{{ training.notes }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">No hay entrenamientos registrados</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+document.getElementById('trainForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const statusContainer = document.getElementById('trainStatus');
+    
+    statusContainer.innerHTML = '<p class="loading">⏳ Iniciando entrenamiento... Esto puede tardar varios minutos.</p>';
+    
+    try {
+        const response = await fetch('{% url "train" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            let html = '<div class="result-success"><h3>✅ Entrenamiento Completado</h3>';
+            html += '<p><strong>Resultados:</strong></p><ul>';
+            
+            if (data.results.pca_svm) {
+                html += `<li>PCA + SVM Accuracy: ${(data.results.pca_svm * 100).toFixed(2)}%</li>`;
+            }
+            if (data.results.tensorflow) {
+                html += `<li>TensorFlow Accuracy: ${(data.results.tensorflow * 100).toFixed(2)}%</li>`;
+            }
+            
+            html += '</ul></div>';
+            statusContainer.innerHTML = html;
+            
+            // Recargar página después de 3 segundos para ver el historial actualizado
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            statusContainer.innerHTML = `
+                <div class="result-error">
+                    <h3>❌ Error</h3>
+                    <p>${data.error || 'Ocurrió un error durante el entrenamiento'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        statusContainer.innerHTML = `
+            <div class="result-error">
+                <h3>❌ Error</h3>
+                <p>${error.message}</p>
+            </div>
+        `;
+    }
+});
+</script>
+{% endblock %}
+

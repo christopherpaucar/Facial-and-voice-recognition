@@ -1,0 +1,6 @@
+# Este directorio contendrá los modelos entrenados
+# - scaler.pkl
+# - pca_model.pkl
+# - svm_model.pkl
+# - tensorflow_model.h5
+

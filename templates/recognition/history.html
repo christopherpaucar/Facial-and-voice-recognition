@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Historial - Sistema de Reconocimiento{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 Historial</h1>
+    <p>Predicciones y entrenamientos realizados</p>
+</div>
+
+<div class="history-section">
+    <h2>Predicciones Recientes</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Predicción</th>
+                <th>Confianza</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pred in predictions %}
+            <tr>
+                <td>{{ pred.created_at|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <span class="badge {% if pred.prediction == 1 %}badge-success{% else %}badge-danger{% endif %}">
+                        {% if pred.prediction == 1 %}Humano{% else %}No Humano{% endif %}
+                    </span>
+                </td>
+                <td>{{ pred.confidence|floatformat:2 }}%</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3">No hay predicciones registradas</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="history-section">
+    <h2>Entrenamientos Realizados</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Accuracy</th>
+                <th>Total Muestras</th>
+                <th>Humanos</th>
+                <th>No Humanos</th>
+                <th>Notas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for training in trainings %}
+            <tr>
+                <td>{{ training.created_at|date:"d/m/Y H:i" }}</td>
+                <td>{{ training.accuracy|floatformat:2 }}%</td>
+                <td>{{ training.total_samples }}</td>
+                <td>{{ training.human_samples }}</td>
+                <td>{{ training.non_human_samples }}</td>
+                <td>{{ training.notes }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">No hay entrenamientos registrados</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+

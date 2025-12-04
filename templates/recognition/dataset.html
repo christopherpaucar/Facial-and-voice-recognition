@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestionar Dataset - Sistema de Reconocimiento{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📁 Gestionar Dataset</h1>
+    <p>Sube imágenes o captura desde la cámara para entrenar el modelo</p>
+    <a href="{% url 'capture' %}" class="btn btn-primary" style="margin-top: 1rem;">📸 Capturar desde Cámara</a>
+</div>
+
+<div class="dataset-stats">
+    <div class="stat-card">
+        <h3>Imágenes Humanas</h3>
+        <p class="stat-number">{{ human_count }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>Imágenes No Humanas</h3>
+        <p class="stat-number">{{ non_human_count }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>Total</h3>
+        <p class="stat-number">{{ total_count }}</p>
+    </div>
+</div>
+
+<div class="upload-section">
+    <div class="upload-card">
+        <h2>Subir Imagen Humana</h2>
+        <form id="uploadHumanForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group">
+                <input type="file" name="image" accept="image/*" required>
+            </div>
+            <input type="hidden" name="label" value="human">
+            <button type="submit" class="btn btn-success">📤 Subir</button>
+        </form>
+    </div>
+
+    <div class="upload-card">
+        <h2>Subir Imagen No Humana</h2>
+        <form id="uploadNonHumanForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group">
+                <input type="file" name="image" accept="image/*" required>
+            </div>
+            <input type="hidden" name="label" value="non_human">
+            <button type="submit" class="btn btn-warning">📤 Subir</button>
+        </form>
+    </div>
+</div>
+
+<div class="dataset-info">
+    <h2>Instrucciones</h2>
+    <ul>
+        <li>Las imágenes humanas deben contener rostros de personas</li>
+        <li>Las imágenes no humanas pueden ser objetos, animales, paisajes, etc.</li>
+        <li>El sistema detectará automáticamente los rostros en las imágenes humanas</li>
+        <li>Se recomienda tener al menos 50 imágenes de cada categoría para un buen entrenamiento</li>
+        <li>Formatos soportados: JPG, PNG, JPEG</li>
+    </ul>
+</div>
+
+<script>
+document.getElementById('uploadHumanForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    await uploadImage(this, 'human');
+});
+
+document.getElementById('uploadNonHumanForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    await uploadImage(this, 'non_human');
+});
+
+async function uploadImage(form, label) {
+    const formData = new FormData(form);
+    
+    try {
+        const response = await fetch('{% url "upload_dataset" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Imagen subida correctamente');
+            location.reload();
+        } else {
+            alert('❌ Error: ' + (data.error || 'No se pudo subir la imagen'));
+        }
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+</script>
+{% endblock %}
+
