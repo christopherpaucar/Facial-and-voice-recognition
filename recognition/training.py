@@ -188,9 +188,17 @@ class ModelTrainer:
         print(f"   Componentes PCA: {self.pca.n_components_}")
         print(f"   Varianza explicada: {self.pca.explained_variance_ratio_.sum():.2%}")
         
-        # SVM
-        print("🤖 Entrenando SVM...")
-        self.svm = SVC(kernel='rbf', probability=True, random_state=42)
+        # SVM con balanceo de clases para manejar dataset desbalanceado
+        print("🤖 Entrenando SVM con balanceo de clases...")
+        # Calcular pesos de clases para balancear el dataset
+        from sklearn.utils.class_weight import compute_class_weight
+        classes = np.unique(y_train)
+        class_weights = compute_class_weight('balanced', classes=classes, y=y_train)
+        class_weight_dict = dict(zip(classes, class_weights))
+        print(f"   Pesos de clases: {class_weight_dict}")
+        print(f"   ⚠️ Dataset desbalanceado detectado - usando class_weight='balanced'")
+        
+        self.svm = SVC(kernel='rbf', probability=True, random_state=42, class_weight='balanced')
         self.svm.fit(X_train_pca, y_train)
         
         # Evaluación
@@ -283,6 +291,14 @@ class ModelTrainer:
         print("📊 Arquitectura del modelo:")
         model.summary()
         
+        # Calcular pesos de clases para balancear dataset desbalanceado
+        from sklearn.utils.class_weight import compute_class_weight
+        classes = np.unique(y_train)
+        class_weights = compute_class_weight('balanced', classes=classes, y=y_train)
+        class_weight_dict = dict(zip(classes, class_weights))
+        print(f"   Pesos de clases: {class_weight_dict}")
+        print(f"   ⚠️ Dataset desbalanceado detectado - usando class_weight para balancear")
+        
         # Callbacks
         early_stopping = keras.callbacks.EarlyStopping(
             monitor='val_loss',
@@ -290,7 +306,7 @@ class ModelTrainer:
             restore_best_weights=True
         )
         
-        # Entrenar
+        # Entrenar con balanceo de clases
         print(f"\n🏋️ Entrenando por {epochs} épocas...")
         history = model.fit(
             X_train_reshaped, y_train,
@@ -298,6 +314,7 @@ class ModelTrainer:
             epochs=epochs,
             validation_data=(X_test_reshaped, y_test),
             callbacks=[early_stopping],
+            class_weight=class_weight_dict,  # Balanceo de clases
             verbose=1
         )
         
