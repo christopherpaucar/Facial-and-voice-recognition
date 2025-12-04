@@ -273,7 +273,15 @@ class ImagePreprocessor:
             Array numpy con la imagen preprocesada, o None si falla
         """
         try:
-            image = cv2.imread(str(image_path))
+            # Leer imagen usando numpy para manejar rutas con caracteres especiales
+            import numpy as np
+            image_path_str = str(image_path)
+            # Usar cv2.imdecode para manejar rutas con caracteres especiales
+            with open(image_path_str, 'rb') as f:
+                image_bytes = f.read()
+            image_array = np.frombuffer(image_bytes, np.uint8)
+            image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+            
             if image is None:
                 return None
             if image.size == 0:
