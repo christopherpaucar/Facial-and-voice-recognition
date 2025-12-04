@@ -15,9 +15,19 @@ class ImagePreprocessor:
             target_size: Tamaño objetivo para redimensionar las imágenes
         """
         self.target_size = target_size
-        self.face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
+        # Cargar el cascade classifier con manejo de errores
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        self.face_cascade = cv2.CascadeClassifier(cascade_path)
+        
+        # Verificar que se cargó correctamente
+        if self.face_cascade.empty():
+            # Intentar con ruta alternativa
+            import os
+            alt_path = os.path.join(os.path.dirname(cv2.__file__), 'data', 'haarcascade_frontalface_default.xml')
+            self.face_cascade = cv2.CascadeClassifier(alt_path)
+            
+            if self.face_cascade.empty():
+                print("⚠️ Advertencia: No se pudo cargar el cascade classifier. La detección de rostros puede fallar.")
     
     def detect_face(self, image):
         """
@@ -29,48 +39,65 @@ class ImagePreprocessor:
         Returns:
             Tupla (x, y, w, h) con las coordenadas del rostro, o None si no se detecta
         """
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # Mejorar contraste para mejor detección
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-        gray_enhanced = clahe.apply(gray)
-        
-        # Intentar con diferentes configuraciones de parámetros
-        configs = [
-            {'scaleFactor': 1.1, 'minNeighbors': 3, 'minSize': (30, 30)},
-            {'scaleFactor': 1.05, 'minNeighbors': 2, 'minSize': (20, 20)},
-            {'scaleFactor': 1.03, 'minNeighbors': 1, 'minSize': (15, 15)},
-            {'scaleFactor': 1.1, 'minNeighbors': 2, 'minSize': (25, 25)},
-        ]
-        
-        for config in configs:
-            faces = self.face_cascade.detectMultiScale(
-                gray_enhanced,
-                scaleFactor=config['scaleFactor'],
-                minNeighbors=config['minNeighbors'],
-                minSize=config['minSize'],
-                flags=cv2.CASCADE_SCALE_IMAGE
-            )
+        try:
+            # Verificar que el cascade esté cargado
+            if self.face_cascade.empty():
+                return None
             
-            if len(faces) > 0:
-                # Retornar el rostro más grande
-                faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
-                return faces[0]
-        
-        # Si aún no se detecta, intentar con la imagen original sin mejora
-        for config in configs[:2]:  # Solo los primeros 2 configs
-            faces = self.face_cascade.detectMultiScale(
-                gray,
-                scaleFactor=config['scaleFactor'],
-                minNeighbors=config['minNeighbors'],
-                minSize=config['minSize']
-            )
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             
-            if len(faces) > 0:
-                faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
-                return faces[0]
-        
-        return None
+            # Mejorar contraste para mejor detección
+            try:
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                gray_enhanced = clahe.apply(gray)
+            except:
+                gray_enhanced = gray
+            
+            # Intentar con diferentes configuraciones de parámetros
+            configs = [
+                {'scaleFactor': 1.1, 'minNeighbors': 3, 'minSize': (30, 30)},
+                {'scaleFactor': 1.05, 'minNeighbors': 2, 'minSize': (20, 20)},
+                {'scaleFactor': 1.03, 'minNeighbors': 1, 'minSize': (15, 15)},
+                {'scaleFactor': 1.1, 'minNeighbors': 2, 'minSize': (25, 25)},
+            ]
+            
+            for config in configs:
+                try:
+                    faces = self.face_cascade.detectMultiScale(
+                        gray_enhanced,
+                        scaleFactor=config['scaleFactor'],
+                        minNeighbors=config['minNeighbors'],
+                        minSize=config['minSize'],
+                        flags=cv2.CASCADE_SCALE_IMAGE
+                    )
+                    
+                    if len(faces) > 0:
+                        # Retornar el rostro más grande
+                        faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
+                        return faces[0]
+                except:
+                    continue
+            
+            # Si aún no se detecta, intentar con la imagen original sin mejora
+            for config in configs[:2]:  # Solo los primeros 2 configs
+                try:
+                    faces = self.face_cascade.detectMultiScale(
+                        gray,
+                        scaleFactor=config['scaleFactor'],
+                        minNeighbors=config['minNeighbors'],
+                        minSize=config['minSize']
+                    )
+                    
+                    if len(faces) > 0:
+                        faces = sorted(faces, key=lambda x: x[2] * x[3], reverse=True)
+                        return faces[0]
+                except:
+                    continue
+            
+            return None
+        except Exception as e:
+            # Si hay cualquier error, retornar None para que use el fallback
+            return None
     
     def to_grayscale(self, image):
         """
@@ -153,7 +180,7 @@ class ImagePreprocessor:
             size = self.target_size
         return cv2.resize(image, size)
     
-    def preprocess_pipeline(self, image, apply_filters=True, detect_face=True):
+    def preprocess_pipeline(self, image, apply_filters=True, detect_face=True, allow_no_face=False):
         """
         Pipeline completo de preprocesamiento
         
@@ -161,23 +188,30 @@ class ImagePreprocessor:
             image: Imagen original en formato BGR
             apply_filters: Si True, aplica filtros de suavizado
             detect_face: Si True, detecta y recorta el rostro
+            allow_no_face: Si True, procesa la imagen completa si no se detecta rostro
             
         Returns:
-            Imagen preprocesada lista para el modelo, o None si no se detecta rostro
+            Imagen preprocesada lista para el modelo, o None si no se detecta rostro y allow_no_face=False
         """
         # 1. Detectar rostro si es necesario
         if detect_face:
-            face_coords = self.detect_face(image)
-            if face_coords is None:
-                return None
-            x, y, w, h = face_coords
-            # Recortar el rostro con un margen
-            margin = 20
-            x = max(0, x - margin)
-            y = max(0, y - margin)
-            w = min(image.shape[1] - x, w + 2 * margin)
-            h = min(image.shape[0] - y, h + 2 * margin)
-            image = image[y:y+h, x:x+w]
+            try:
+                face_coords = self.detect_face(image)
+                if face_coords is not None:
+                    x, y, w, h = face_coords
+                    # Recortar el rostro con un margen
+                    margin = 20
+                    x = max(0, x - margin)
+                    y = max(0, y - margin)
+                    w = min(image.shape[1] - x, w + 2 * margin)
+                    h = min(image.shape[0] - y, h + 2 * margin)
+                    image = image[y:y+h, x:x+w]
+                elif not allow_no_face:
+                    return None
+            except:
+                # Si falla la detección y no se permite sin rostro, retornar None
+                if not allow_no_face:
+                    return None
         
         # 2. Convertir a escala de grises
         gray = self.to_grayscale(image)
@@ -238,30 +272,52 @@ class ImagePreprocessor:
         Returns:
             Array numpy con la imagen preprocesada, o None si falla
         """
-        image = cv2.imread(image_path)
-        if image is None:
+        try:
+            image = cv2.imread(image_path)
+            if image is None:
+                return None
+            
+            # Eliminar fondo si se solicita
+            if remove_bg:
+                try:
+                    image = self.remove_background(image)
+                except:
+                    pass  # Continuar sin eliminar fondo si falla
+            
+            # Intentar detectar rostro primero (con allow_no_face si fallback está activado)
+            try:
+                processed = self.preprocess_pipeline(
+                    image, 
+                    apply_filters=apply_filters, 
+                    detect_face=True,
+                    allow_no_face=fallback_no_face
+                )
+            except Exception as e:
+                # Si falla el pipeline, usar fallback
+                processed = None
+            
+            # Si aún no se procesó y fallback está activado, procesar la imagen completa
+            if processed is None and fallback_no_face:
+                try:
+                    # Redimensionar la imagen completa y procesarla
+                    gray = self.to_grayscale(image)
+                    if apply_filters:
+                        try:
+                            gray = self.apply_bilateral_filter(gray)
+                            gray = self.apply_histogram_equalization(gray)
+                        except:
+                            pass  # Continuar sin filtros si fallan
+                    resized = self.resize(gray)
+                    processed = self.normalize(resized)
+                except Exception as e:
+                    return None
+            
+            if processed is None:
+                return None
+            
+            # Aplanar para el modelo
+            return processed.flatten()
+        except Exception as e:
+            # Cualquier error, retornar None
             return None
-        
-        # Eliminar fondo si se solicita
-        if remove_bg:
-            image = self.remove_background(image)
-        
-        # Intentar detectar rostro primero
-        processed = self.preprocess_pipeline(image, apply_filters=apply_filters, detect_face=True)
-        
-        # Si no se detecta rostro y fallback está activado, procesar la imagen completa
-        if processed is None and fallback_no_face:
-            # Redimensionar la imagen completa y procesarla
-            gray = self.to_grayscale(image)
-            if apply_filters:
-                gray = self.apply_bilateral_filter(gray)
-                gray = self.apply_histogram_equalization(gray)
-            resized = self.resize(gray)
-            processed = self.normalize(resized)
-        
-        if processed is None:
-            return None
-        
-        # Aplanar para el modelo
-        return processed.flatten()
 

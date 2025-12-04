@@ -58,21 +58,13 @@ class ModelTrainer:
             img_files = list(human_dir.glob('*.jpg')) + list(human_dir.glob('*.png')) + list(human_dir.glob('*.jpeg'))
             print(f"   Encontradas {len(img_files)} imágenes")
             for img_file in img_files:
-                # Intentar primero con eliminación de fondo, luego sin ella
+                # Procesar imagen (siempre con fallback activado)
                 processed = self.preprocessor.preprocess_for_training(
                     str(img_file), 
                     apply_filters=True, 
-                    fallback_no_face=True,
-                    remove_bg=True  # Intentar eliminar fondo primero
+                    fallback_no_face=True,  # SIEMPRE procesar aunque no detecte rostro
+                    remove_bg=False  # No eliminar fondo por defecto (más rápido y confiable)
                 )
-                # Si falla, intentar sin eliminar fondo
-                if processed is None:
-                    processed = self.preprocessor.preprocess_for_training(
-                        str(img_file), 
-                        apply_filters=True, 
-                        fallback_no_face=True,
-                        remove_bg=False
-                    )
                 
                 if processed is not None:
                     X.append(processed)
