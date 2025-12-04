@@ -53,12 +53,14 @@ class ImagePreprocessor:
             except:
                 gray_enhanced = gray
             
-            # Intentar con diferentes configuraciones de parámetros
+            # Intentar con diferentes configuraciones de parámetros (más agresivo para detectar rostros)
             configs = [
-                {'scaleFactor': 1.1, 'minNeighbors': 3, 'minSize': (30, 30)},
                 {'scaleFactor': 1.05, 'minNeighbors': 2, 'minSize': (20, 20)},
                 {'scaleFactor': 1.03, 'minNeighbors': 1, 'minSize': (15, 15)},
+                {'scaleFactor': 1.1, 'minNeighbors': 3, 'minSize': (30, 30)},
                 {'scaleFactor': 1.1, 'minNeighbors': 2, 'minSize': (25, 25)},
+                {'scaleFactor': 1.02, 'minNeighbors': 1, 'minSize': (10, 10)},  # Más sensible
+                {'scaleFactor': 1.1, 'minNeighbors': 1, 'minSize': (20, 20)},  # Más permisivo
             ]
             
             for config in configs:

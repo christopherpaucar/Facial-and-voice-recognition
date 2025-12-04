@@ -66,8 +66,11 @@ class FacePredictor:
                 'label': 'Humano' o 'No Humano'
             }
         """
-        # Preprocesar imagen: intentar detectar rostro, pero si falla procesar imagen completa
-        # Esto permite que funcione tanto para imágenes humanas como no humanas
+        import cv2
+        import numpy as np
+        
+        # Procesar imagen: intentar detectar rostro, pero si no se detecta, procesar imagen completa
+        # El modelo decidirá si es humano o no basándose en las características de la imagen
         processed = self.preprocessor.preprocess_for_training(
             image_path,
             apply_filters=True,
@@ -141,12 +144,19 @@ class FacePredictor:
         features_pca = self.pca.transform(features_scaled)
         
         # Predicción
-        prediction = self.svm.predict(features_pca)[0]
         probabilities = self.svm.predict_proba(features_pca)[0]
-        confidence = float(probabilities[int(prediction)])
+        
+        # Determinar predicción basada en la probabilidad más alta
+        # probabilities[0] = No Humano, probabilities[1] = Humano
+        if probabilities[1] > probabilities[0]:
+            prediction = 1  # Humano
+            confidence = float(probabilities[1])
+        else:
+            prediction = 0  # No Humano
+            confidence = float(probabilities[0])
         
         return {
-            'prediction': int(prediction),
+            'prediction': prediction,
             'confidence': confidence,
             'label': 'Humano' if prediction == 1 else 'No Humano',
             'probabilities': {
@@ -171,16 +181,26 @@ class FacePredictor:
         
         # Predicción
         probabilities = self.tf_model.predict(features_reshaped, verbose=0)[0]
-        prediction = 1 if probabilities[0] > 0.5 else 0
-        confidence = float(probabilities[0]) if prediction == 1 else float(1 - probabilities[0])
+        
+        # probabilities[0] es la probabilidad de "Humano" en TensorFlow
+        prob_humano = float(probabilities[0])
+        prob_no_humano = float(1 - probabilities[0])
+        
+        # Determinar predicción basada en la probabilidad más alta
+        if prob_humano > prob_no_humano:
+            prediction = 1  # Humano
+            confidence = prob_humano
+        else:
+            prediction = 0  # No Humano
+            confidence = prob_no_humano
         
         return {
             'prediction': prediction,
             'confidence': confidence,
             'label': 'Humano' if prediction == 1 else 'No Humano',
             'probabilities': {
-                'no_humano': float(1 - probabilities[0]),
-                'humano': float(probabilities[0])
+                'no_humano': prob_no_humano,
+                'humano': prob_humano
             }
         }
 
