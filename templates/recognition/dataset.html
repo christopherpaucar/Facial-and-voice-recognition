@@ -26,27 +26,37 @@
 
 <div class="upload-section">
     <div class="upload-card">
-        <h2>Subir Imagen Humana</h2>
-        <form id="uploadHumanForm" enctype="multipart/form-data">
-            {% csrf_token %}
-            <div class="form-group">
-                <input type="file" name="image" accept="image/*" required>
+        <h2>📤 Subir Imágenes Humanas</h2>
+        <div class="upload-wrapper">
+            <div class="upload-area" id="uploadAreaHuman">
+                <p style="font-size: 1.2rem; margin-bottom: 1rem;">📁 Arrastra imágenes aquí o haz clic para seleccionar</p>
+                <input type="file" id="fileInputHuman" multiple accept="image/*" style="display: none;">
+                <button class="btn btn-primary" id="btnSelectFilesHuman">Seleccionar Imágenes</button>
+                <p style="margin-top: 1rem; color: #666; font-size: 0.9rem;">Puedes seleccionar múltiples imágenes a la vez</p>
             </div>
-            <input type="hidden" name="label" value="human">
-            <button type="submit" class="btn btn-success">📤 Subir</button>
-        </form>
+            <div id="fileListHuman" class="file-list" style="margin-top: 1.5rem;"></div>
+            <div class="upload-controls" style="margin-top: 1.5rem;">
+                <button id="btnUploadFilesHuman" class="btn btn-success btn-lg" style="display: none;">📤 Subir Imágenes al Dataset</button>
+            </div>
+            <div id="uploadStatusHuman" class="upload-status" style="margin-top: 1rem;"></div>
+        </div>
     </div>
 
     <div class="upload-card">
-        <h2>Subir Imagen No Humana</h2>
-        <form id="uploadNonHumanForm" enctype="multipart/form-data">
-            {% csrf_token %}
-            <div class="form-group">
-                <input type="file" name="image" accept="image/*" required>
+        <h2>📤 Subir Imágenes No Humanas</h2>
+        <div class="upload-wrapper">
+            <div class="upload-area" id="uploadAreaNonHuman">
+                <p style="font-size: 1.2rem; margin-bottom: 1rem;">📁 Arrastra imágenes aquí o haz clic para seleccionar</p>
+                <input type="file" id="fileInputNonHuman" multiple accept="image/*" style="display: none;">
+                <button class="btn btn-primary" id="btnSelectFilesNonHuman">Seleccionar Imágenes</button>
+                <p style="margin-top: 1rem; color: #666; font-size: 0.9rem;">Puedes seleccionar múltiples imágenes a la vez</p>
             </div>
-            <input type="hidden" name="label" value="non_human">
-            <button type="submit" class="btn btn-warning">📤 Subir</button>
-        </form>
+            <div id="fileListNonHuman" class="file-list" style="margin-top: 1.5rem;"></div>
+            <div class="upload-controls" style="margin-top: 1.5rem;">
+                <button id="btnUploadFilesNonHuman" class="btn btn-warning btn-lg" style="display: none;">📤 Subir Imágenes al Dataset</button>
+            </div>
+            <div id="uploadStatusNonHuman" class="upload-status" style="margin-top: 1rem;"></div>
+        </div>
     </div>
 </div>
 
@@ -61,41 +71,303 @@
     </ul>
 </div>
 
+{% csrf_token %}
+
 <script>
-document.getElementById('uploadHumanForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    await uploadImage(this, 'human');
-});
+// Variables globales
+let selectedFilesHuman = [];
+let selectedFilesNonHuman = [];
 
-document.getElementById('uploadNonHumanForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    await uploadImage(this, 'non_human');
-});
-
-async function uploadImage(form, label) {
-    const formData = new FormData(form);
-    
-    try {
-        const response = await fetch('{% url "upload_dataset" %}', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+// Obtener token CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
             }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            alert('✅ Imagen subida correctamente');
-            location.reload();
-        } else {
-            alert('❌ Error: ' + (data.error || 'No se pudo subir la imagen'));
         }
-    } catch (error) {
-        alert('❌ Error: ' + error.message);
     }
+    return cookieValue;
 }
+
+const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+// ========== FUNCIONALIDAD PARA IMÁGENES HUMANAS ==========
+function setupUploadArea(areaId, inputId, btnSelectId, fileListId, btnUploadId, statusId, label, filesArrayRef) {
+    const uploadArea = document.getElementById(areaId);
+    const fileInput = document.getElementById(inputId);
+    const btnSelectFiles = document.getElementById(btnSelectId);
+    
+    // Click en el área de subida o botón
+    uploadArea.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    btnSelectFiles.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.click();
+    });
+    
+    // Cambio de archivos
+    fileInput.addEventListener('change', (e) => {
+        filesArrayRef.length = 0;
+        filesArrayRef.push(...Array.from(e.target.files));
+        displayFileList(fileListId, btnUploadId, filesArrayRef);
+    });
+    
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.style.background = '#e3f2fd';
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.style.background = '';
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.style.background = '';
+        const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+        if (files.length > 0) {
+            filesArrayRef.length = 0;
+            filesArrayRef.push(...files);
+            displayFileList(fileListId, btnUploadId, filesArrayRef);
+        }
+    });
+    
+    // Botón de subir archivos
+    document.getElementById(btnUploadId).addEventListener('click', async () => {
+        if (filesArrayRef.length === 0) {
+            updateUploadStatus(statusId, '❌ No hay archivos seleccionados', 'error');
+            return;
+        }
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        updateUploadStatus(statusId, `📤 Subiendo ${filesArrayRef.length} archivos...`, 'info');
+        document.getElementById(btnUploadId).disabled = true;
+        
+        for (let i = 0; i < filesArrayRef.length; i++) {
+            const file = filesArrayRef[i];
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('label', label);
+            
+            try {
+                const response = await fetch('{% url "upload_dataset" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrftoken
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    successCount++;
+                    updateUploadStatus(statusId, `✅ ${i + 1}/${filesArrayRef.length} archivos subidos (${successCount} exitosos)`, 'success');
+                } else {
+                    errorCount++;
+                    updateUploadStatus(statusId, `⚠️ Error en ${file.name}: ${data.error || 'Error desconocido'}`, 'error');
+                }
+            } catch (error) {
+                errorCount++;
+                updateUploadStatus(statusId, `❌ Error al subir ${file.name}: ${error.message}`, 'error');
+            }
+        }
+        
+        document.getElementById(btnUploadId).disabled = false;
+        
+        if (successCount > 0) {
+            updateUploadStatus(statusId, `✅ ${successCount} archivos subidos exitosamente${errorCount > 0 ? `, ${errorCount} errores` : ''}`, 'success');
+            filesArrayRef.length = 0;
+            fileInput.value = '';
+            displayFileList(fileListId, btnUploadId, filesArrayRef);
+            // Recargar página después de 2 segundos para actualizar estadísticas
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            updateUploadStatus(statusId, `❌ No se pudo subir ningún archivo`, 'error');
+        }
+    });
+}
+
+// Función para mostrar lista de archivos
+function displayFileList(fileListId, btnUploadId, filesArray) {
+    const fileList = document.getElementById(fileListId);
+    const btnUpload = document.getElementById(btnUploadId);
+    
+    if (filesArray.length === 0) {
+        fileList.innerHTML = '';
+        btnUpload.style.display = 'none';
+        return;
+    }
+    
+    fileList.innerHTML = `<h3 style="margin-bottom: 1rem;">Archivos seleccionados: ${filesArray.length}</h3>`;
+    filesArray.forEach((file, index) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <span style="flex: 1;">${file.name}</span>
+            <span style="color: #666; margin: 0 1rem;">(${(file.size / 1024).toFixed(1)} KB)</span>
+            <button class="btn-remove" data-index="${index}" data-filelist="${fileListId}" data-btnupload="${btnUploadId}">✕</button>
+        `;
+        fileList.appendChild(fileItem);
+    });
+    
+    // Agregar event listeners a los botones de eliminar
+    fileList.querySelectorAll('.btn-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const index = parseInt(btn.getAttribute('data-index'));
+            const listId = btn.getAttribute('data-filelist');
+            const uploadId = btn.getAttribute('data-btnupload');
+            removeFile(listId, uploadId, index);
+        });
+    });
+    
+    btnUpload.style.display = 'inline-block';
+}
+
+// Función para eliminar archivo
+function removeFile(fileListId, btnUploadId, index) {
+    // Determinar qué array usar basado en el ID
+    let filesArray;
+    if (fileListId === 'fileListHuman') {
+        filesArray = selectedFilesHuman;
+    } else {
+        filesArray = selectedFilesNonHuman;
+    }
+    
+    filesArray.splice(index, 1);
+    displayFileList(fileListId, btnUploadId, filesArray);
+}
+
+// Función para actualizar estado de subida
+function updateUploadStatus(statusId, message, type = 'info') {
+    const statusDiv = document.getElementById(statusId);
+    statusDiv.textContent = message;
+    statusDiv.className = 'upload-status ' + type;
+}
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    // Configurar área de subida para imágenes humanas
+    setupUploadArea(
+        'uploadAreaHuman',
+        'fileInputHuman',
+        'btnSelectFilesHuman',
+        'fileListHuman',
+        'btnUploadFilesHuman',
+        'uploadStatusHuman',
+        'human',
+        selectedFilesHuman
+    );
+    
+    // Configurar área de subida para imágenes no humanas
+    setupUploadArea(
+        'uploadAreaNonHuman',
+        'fileInputNonHuman',
+        'btnSelectFilesNonHuman',
+        'fileListNonHuman',
+        'btnUploadFilesNonHuman',
+        'uploadStatusNonHuman',
+        'non_human',
+        selectedFilesNonHuman
+    );
+});
 </script>
+
+<style>
+/* Upload area */
+.upload-wrapper {
+    padding: 1rem;
+}
+
+.upload-area {
+    border: 3px dashed #667eea;
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    text-align: center;
+    background: #f8f9fa;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.upload-area:hover {
+    background: #e3f2fd;
+    border-color: #5568d3;
+}
+
+.file-list {
+    max-height: 300px;
+    overflow-y: auto;
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+    background: white;
+    border-radius: 6px;
+    border-left: 4px solid #667eea;
+}
+
+.btn-remove {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-remove:hover {
+    background: #c82333;
+}
+
+.upload-controls {
+    text-align: center;
+}
+
+.upload-status {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    text-align: center;
+    font-weight: 500;
+}
+
+.upload-status.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.upload-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.upload-status.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+</style>
 {% endblock %}
 
