@@ -13,17 +13,18 @@
         <h2>Configuración de Entrenamiento</h2>
         <form id="trainForm">
             {% csrf_token %}
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="use_pca_svm" checked>
-                    Entrenar modelo PCA + SVM
-                </label>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="use_tensorflow" checked>
-                    Entrenar modelo TensorFlow
-                </label>
+            <div class="training-info">
+                <p style="margin-bottom: 1.5rem; color: #666;">
+                    Se entrenarán <strong>ambos modelos</strong> automáticamente:
+                </p>
+                <ul style="list-style: none; padding-left: 0; margin-bottom: 1.5rem;">
+                    <li style="padding: 0.75rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid #667eea;">
+                        <strong>🤖 PCA + SVM:</strong> Modelo rápido y eficiente para clasificación
+                    </li>
+                    <li style="padding: 0.75rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+                        <strong>🧠 TensorFlow CNN:</strong> Red neuronal profunda para mayor precisión
+                    </li>
+                </ul>
             </div>
             <button type="submit" class="btn btn-primary btn-lg">🚀 Iniciar Entrenamiento</button>
         </form>

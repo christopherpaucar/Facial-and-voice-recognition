@@ -305,13 +305,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // Esperar un momento para que el usuario se acomode
-            updateStatus('⏳ Preparando captura en 3 segundos...', 'info');
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Deshabilitar botón durante el countdown
+            const startCaptureBtn = document.getElementById('startCapture');
+            const originalText = startCaptureBtn.textContent;
+            startCaptureBtn.disabled = true;
             
-            // Ocultar botón de captura
-            document.getElementById('startCapture').style.display = 'none';
+            // Countdown de 3 segundos con actualización visual
+            let countdown = 3;
+            const countdownInterval = setInterval(() => {
+                if (countdown > 0) {
+                    startCaptureBtn.textContent = `📸 Iniciando en ${countdown}...`;
+                    updateStatus(`⏱️ Preparando captura en ${countdown} segundos...`, 'info');
+                    countdown--;
+                } else {
+                    clearInterval(countdownInterval);
+                    startCaptureBtn.textContent = '📸 ¡Iniciando captura!';
+                    updateStatus('📸 ¡Iniciando captura!', 'success');
+                    
+                    // Pequeño delay antes de empezar
+                    setTimeout(() => {
+                        startCaptureBtn.textContent = originalText;
+                        startCaptureBtn.disabled = false;
+                        
+                        // Ocultar botón de captura
+                        startCaptureBtn.style.display = 'none';
+                        
+                        // Continuar con la captura
+                        startCaptureProcess();
+                    }, 300);
+                }
+            }, 1000);
             
+        } catch (error) {
+            isCapturing = false;
+            updateStatus('❌ Error al acceder a la cámara: ' + error.message, 'error');
+            console.error('Error accessing camera:', error);
+            
+            // Rehabilitar controles en caso de error
+            document.getElementById('photoCount').disabled = false;
+            document.getElementById('delay').disabled = false;
+            document.getElementById('label').disabled = false;
+            document.getElementById('startCapture').style.display = 'inline-block';
+            document.getElementById('startCapture').disabled = false;
+        }
+    });
+    
+    // Función para iniciar el proceso de captura (separada para reutilizar)
+    async function startCaptureProcess() {
+        try {
             // Obtener configuración
             const count = parseInt(document.getElementById('photoCount').value) || 40;
             const delay = parseInt(document.getElementById('delay').value) || 300;
@@ -366,8 +407,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (error) {
             isCapturing = false;
-            updateStatus('❌ Error al acceder a la cámara: ' + error.message, 'error');
-            console.error('Error accessing camera:', error);
+            updateStatus('❌ Error durante la captura: ' + error.message, 'error');
+            console.error('Error during capture:', error);
             
             // Rehabilitar controles en caso de error
             document.getElementById('photoCount').disabled = false;
@@ -375,12 +416,13 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('label').disabled = false;
             document.getElementById('startCapture').style.display = 'inline-block';
         }
-    });
+    }
 
     // Detener cámara
-    document.getElementById('stopCamera').addEventListener('click', () => {
+    document.getElementById('stopCamera').addEventListener('click', async () => {
         isCapturing = false;
         
+        // Detener la cámara actual
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
@@ -389,8 +431,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.getElementById('startCapture').style.display = 'none';
         document.getElementById('stopCamera').style.display = 'none';
-        document.getElementById('cameraStatus').innerHTML = '<p style="color: #666;">⏹️ Cámara detenida</p>';
-        updateStatus('⏹️ Cámara detenida', 'info');
+        document.getElementById('cameraStatus').innerHTML = '<p style="color: #666;">⏹️ Cámara detenida - Reactivando...</p>';
+        updateStatus('⏹️ Cámara detenida - Reactivando automáticamente...', 'info');
+        
+        // Esperar un momento antes de reactivar
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Reactivar la cámara automáticamente
+        try {
+            await activateCamera();
+        } catch (error) {
+            document.getElementById('cameraStatus').innerHTML = '<p style="color: #dc3545;">❌ Error al reactivar la cámara</p>';
+            updateStatus('❌ Error al reactivar la cámara: ' + error.message, 'error');
+            console.error('Error reactivating camera:', error);
+        }
     });
     
     // ========== FUNCIONALIDAD DE SUBIDA DE ARCHIVOS ==========
@@ -594,15 +648,23 @@ function updateUploadStatus(message, type = 'info') {
 .camera-wrapper {
     text-align: center;
     margin: 1rem 0;
-    padding: 1rem;
+    padding: 0.5rem;
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-radius: 12px;
     box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.1);
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+    overflow: hidden;
 }
 
 .camera-wrapper video {
-    max-width: 100%;
+    width: 100%;
+    max-height: 400px;
+    height: auto;
     border-radius: 8px;
+    object-fit: cover;
+    display: block;
 }
 
 /* Botones */

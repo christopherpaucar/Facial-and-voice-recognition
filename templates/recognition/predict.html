@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load tz %}
 
 {% block title %}Probar Modelo - Sistema de Reconocimiento{% endblock %}
 
@@ -10,33 +11,54 @@
 
 <div class="predict-container">
     <div class="predict-card">
-        <h2>Subir Imagen</h2>
+        <h2>📤 Subir Imagen o Tomar Foto</h2>
+        <!-- Selector de Método -->
+        <div class="method-selector" style="margin-bottom: 1.5rem;">
+            <button type="button" id="btnUploadMode" class="method-btn active">📁 Subir Archivo</button>
+            <button type="button" id="btnCameraMode" class="method-btn">📹 Tomar Foto</button>
+        </div>
+        
         <form id="predictForm" enctype="multipart/form-data">
             {% csrf_token %}
-            <div class="form-group">
-                <label for="image">Seleccionar Imagen:</label>
-                <input type="file" id="image" name="image" accept="image/*" required>
+            <!-- Panel de Subida de Archivos -->
+            <div id="uploadPanel" class="upload-wrapper">
+                <div class="upload-area" id="uploadArea">
+                    <p style="font-size: 1.2rem; margin-bottom: 1rem;">📁 Arrastra una imagen aquí o haz clic para seleccionar</p>
+                    <input type="file" id="image" name="image" accept="image/*" style="display: none;">
+                    <button type="button" class="btn btn-primary" id="btnSelectFile">Seleccionar Imagen</button>
+                    <p style="margin-top: 1rem; color: #666; font-size: 0.9rem;">Solo se puede analizar una imagen a la vez</p>
+                </div>
+                <div id="fileList" class="file-list" style="margin-top: 1.5rem; display: none;"></div>
             </div>
-            <div class="form-group">
-                <label for="model_type">Modelo a usar:</label>
-                <select id="model_type" name="model_type" class="form-control">
-                    <option value="pca_svm">PCA + SVM</option>
-                    <option value="tensorflow">TensorFlow</option>
-                </select>
+            
+            <!-- Panel de Cámara -->
+            <div id="cameraPanel" class="camera-wrapper" style="display: none;">
+                <video id="video" autoplay playsinline style="width: 100%; max-width: 100%; border-radius: 8px; background: #000; transform: scaleX(-1);"></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+                <div class="camera-controls" style="margin-top: 1rem; text-align: center;">
+                    <button type="button" id="btnCapturePhoto" class="btn btn-primary btn-lg" style="display: none;">📸 Capturar Foto</button>
+                    <div id="cameraStatus" style="text-align: center; margin-top: 1rem; color: #666;">
+                        <p>🔄 Activando cámara...</p>
+                    </div>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary btn-lg">🔍 Analizar Imagen</button>
+            
+            <!-- Botón de Analizar (común para ambos métodos) -->
+            <div class="upload-controls" style="margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary btn-lg" id="btnAnalyze" style="display: none;">🔍 Analizar Imagen</button>
+            </div>
         </form>
     </div>
 
     <div class="predict-card">
-        <h2>Vista Previa</h2>
+        <h2>👁️ Vista Previa</h2>
         <div id="imagePreview" class="image-preview">
             <p>La imagen aparecerá aquí</p>
         </div>
     </div>
 
     <div class="predict-card">
-        <h2>Resultado</h2>
+        <h2>📊 Resultado</h2>
         <div id="resultContainer" class="result-container">
             <p class="placeholder">El resultado aparecerá aquí después de analizar la imagen</p>
         </div>
@@ -53,10 +75,10 @@
                 <th>Confianza</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="predictionsTableBody">
             {% for pred in recent_predictions %}
-            <tr>
-                <td>{{ pred.created_at|date:"d/m/Y H:i" }}</td>
+            <tr class="prediction-row" data-prediction-id="{{ pred.id }}" data-image-url="{{ pred.get_image_url }}" data-prediction-label="{% if pred.prediction == 1 %}Humano{% else %}No Humano{% endif %}" data-confidence="{{ pred.confidence|floatformat:2 }}" style="cursor: pointer;">
+                <td>{{ pred.created_at|localtime|date:"d/m/Y H:i" }}</td>
                 <td>
                     <span class="badge {% if pred.prediction == 1 %}badge-success{% else %}badge-danger{% endif %}">
                         {{ pred.get_prediction_display }}
@@ -73,25 +95,333 @@
     </table>
 </div>
 
+<!-- Modal para mostrar la imagen -->
+<div id="imageModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div class="modal-header">
+            <h3>📸 Imagen de la Predicción</h3>
+        </div>
+        <div class="modal-body">
+            <div class="prediction-info">
+                <p><strong>Predicción:</strong> <span id="modalPrediction" class="prediction-badge"></span></p>
+                <p><strong>Confianza:</strong> <span id="modalConfidence"></span>%</p>
+            </div>
+            <div class="image-container">
+                <img id="modalImage" src="" alt="Imagen de predicción" />
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-document.getElementById('image').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            document.getElementById('imagePreview').innerHTML = 
-                `<img src="${e.target.result}" alt="Preview" style="max-width: 100%; border-radius: 8px;">`;
-        };
-        reader.readAsDataURL(file);
+// Variables globales
+let selectedFile = null;
+let stream = null;
+let video = null;
+let canvas = null;
+let ctx = null;
+let currentMode = 'upload'; // 'upload' o 'camera'
+
+// Obtener token CSRF
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+// Elementos del DOM
+const fileInput = document.getElementById('image');
+const uploadArea = document.getElementById('uploadArea');
+const btnSelectFile = document.getElementById('btnSelectFile');
+const fileList = document.getElementById('fileList');
+const btnAnalyze = document.getElementById('btnAnalyze');
+const imagePreview = document.getElementById('imagePreview');
+const uploadPanel = document.getElementById('uploadPanel');
+const cameraPanel = document.getElementById('cameraPanel');
+const btnUploadMode = document.getElementById('btnUploadMode');
+const btnCameraMode = document.getElementById('btnCameraMode');
+const btnCapturePhoto = document.getElementById('btnCapturePhoto');
+const cameraStatus = document.getElementById('cameraStatus');
+
+// Inicializar elementos de cámara cuando estén disponibles
+document.addEventListener('DOMContentLoaded', function() {
+    video = document.getElementById('video');
+    canvas = document.getElementById('canvas');
+    if (canvas) {
+        ctx = canvas.getContext('2d');
+    }
+    
+    // Event listener para capturar foto
+    if (btnCapturePhoto) {
+        btnCapturePhoto.addEventListener('click', capturePhoto);
     }
 });
 
+// Función para mostrar la lista de archivos
+function displayFileList() {
+    if (selectedFile) {
+        fileList.style.display = 'block';
+        fileList.innerHTML = `
+            <div class="file-item">
+                <span style="flex: 1;">${selectedFile.name}</span>
+                <span style="color: #666; margin: 0 1rem;">(${(selectedFile.size / 1024).toFixed(1)} KB)</span>
+                <button type="button" onclick="removeFile()" class="btn-remove">✕</button>
+            </div>
+        `;
+        btnAnalyze.style.display = 'inline-block';
+        
+        // Mostrar preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            showImagePreview(e.target.result);
+        };
+        reader.readAsDataURL(selectedFile);
+    } else {
+        fileList.style.display = 'none';
+        btnAnalyze.style.display = 'none';
+        if (currentMode === 'upload') {
+            imagePreview.innerHTML = '<p>La imagen aparecerá aquí</p>';
+        }
+    }
+}
+
+
+// Función para eliminar archivo
+function removeFile() {
+    selectedFile = null;
+    fileInput.value = '';
+    displayFileList();
+    imagePreview.innerHTML = '<p>La imagen aparecerá aquí</p>';
+}
+
+// Función para mostrar preview de imagen (desde archivo o captura)
+function showImagePreview(imageData) {
+    imagePreview.innerHTML = `<img src="${imageData}" alt="Preview" style="max-width: 100%; border-radius: 8px;">`;
+    btnAnalyze.style.display = 'inline-block';
+}
+
+// Activar cámara
+async function activateCamera() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'user',
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            } 
+        });
+        video.srcObject = stream;
+        await video.play();
+        
+        // Configurar canvas
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Mostrar botón de captura
+        btnCapturePhoto.style.display = 'inline-block';
+        cameraStatus.innerHTML = '<p style="color: #28a745;">✅ Cámara activa - Presiona "Capturar Foto" cuando estés listo</p>';
+    } catch (error) {
+        cameraStatus.innerHTML = '<p style="color: #dc3545;">❌ Error al acceder a la cámara: ' + error.message + '</p>';
+        console.error('Error accessing camera:', error);
+    }
+}
+
+// Detener cámara
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        if (video) {
+            video.srcObject = null;
+        }
+    }
+    btnCapturePhoto.style.display = 'none';
+    cameraStatus.innerHTML = '<p style="color: #666;">Cámara detenida</p>';
+}
+
+// Capturar foto desde la cámara
+async function capturePhoto() {
+    if (!video || !canvas || !ctx) {
+        alert('La cámara no está lista');
+        return;
+    }
+    
+    // Deshabilitar botón durante el countdown
+    btnCapturePhoto.disabled = true;
+    
+    // Countdown de 3 segundos
+    let countdown = 3;
+    const originalText = btnCapturePhoto.textContent;
+    
+    const countdownInterval = setInterval(() => {
+        if (countdown > 0) {
+            btnCapturePhoto.textContent = `📸 Capturando en ${countdown}...`;
+            cameraStatus.innerHTML = `<p style="color: #ff9800; font-size: 1.1rem; font-weight: bold;">⏱️ ${countdown}...</p>`;
+            countdown--;
+        } else {
+            clearInterval(countdownInterval);
+            btnCapturePhoto.textContent = '📸 ¡Sonríe!';
+            cameraStatus.innerHTML = '<p style="color: #28a745; font-size: 1.1rem; font-weight: bold;">📸 ¡Capturando!</p>';
+            
+            // Pequeño delay antes de capturar
+            setTimeout(() => {
+                try {
+                    // Dibujar video en canvas (con espejo)
+                    ctx.save();
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+                    ctx.restore();
+                    
+                    // Convertir canvas a blob y crear un File
+                    canvas.toBlob(function(blob) {
+                        // Crear un File desde el blob
+                        const timestamp = Date.now();
+                        const filename = `capture_${timestamp}.jpg`;
+                        selectedFile = new File([blob], filename, { type: 'image/jpeg' });
+                        
+                        // Crear un DataTransfer para asignar el archivo al input
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(selectedFile);
+                        fileInput.files = dataTransfer.files;
+                        
+                        // Mostrar preview
+                        const imageData = canvas.toDataURL('image/jpeg', 0.95);
+                        showImagePreview(imageData);
+                        
+                        // Mostrar información del archivo
+                        fileList.style.display = 'block';
+                        fileList.innerHTML = `
+                            <div class="file-item">
+                                <span style="flex: 1;">${filename}</span>
+                                <span style="color: #666; margin: 0 1rem;">Foto capturada</span>
+                                <button type="button" onclick="removeFile()" class="btn-remove">✕</button>
+                            </div>
+                        `;
+                        
+                        cameraStatus.innerHTML = '<p style="color: #28a745;">✅ Foto capturada - Puedes analizarla o capturar otra</p>';
+                        
+                        // Restaurar botón
+                        btnCapturePhoto.textContent = originalText;
+                        btnCapturePhoto.disabled = false;
+                    }, 'image/jpeg', 0.95);
+                } catch (error) {
+                    alert('Error al capturar foto: ' + error.message);
+                    console.error('Error capturing photo:', error);
+                    btnCapturePhoto.textContent = originalText;
+                    btnCapturePhoto.disabled = false;
+                    cameraStatus.innerHTML = '<p style="color: #dc3545;">❌ Error al capturar foto</p>';
+                }
+            }, 200); // 200ms después del countdown para asegurar que se captura bien
+        }
+    }, 1000); // Actualizar cada segundo
+}
+
+// Selector de método: Subir Archivo
+btnUploadMode.addEventListener('click', function() {
+    currentMode = 'upload';
+    uploadPanel.style.display = 'block';
+    cameraPanel.style.display = 'none';
+    btnUploadMode.classList.add('active');
+    btnCameraMode.classList.remove('active');
+    
+    // Detener cámara si está activa
+    stopCamera();
+    
+    // Limpiar selección
+    selectedFile = null;
+    fileInput.value = '';
+    displayFileList();
+    imagePreview.innerHTML = '<p>La imagen aparecerá aquí</p>';
+});
+
+// Selector de método: Tomar Foto
+btnCameraMode.addEventListener('click', function() {
+    currentMode = 'camera';
+    uploadPanel.style.display = 'none';
+    cameraPanel.style.display = 'block';
+    btnCameraMode.classList.add('active');
+    btnUploadMode.classList.remove('active');
+    
+    // Limpiar selección anterior
+    selectedFile = null;
+    fileInput.value = '';
+    fileList.style.display = 'none';
+    btnAnalyze.style.display = 'none';
+    imagePreview.innerHTML = '<p>La imagen aparecerá aquí</p>';
+    
+    // Activar cámara
+    activateCamera();
+});
+
+// Click en el área de subida o botón
+uploadArea.addEventListener('click', () => {
+    fileInput.click();
+});
+
+btnSelectFile.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput.click();
+});
+
+// Cambio de archivos
+fileInput.addEventListener('change', function(e) {
+    const files = e.target.files;
+    if (files.length > 0) {
+        selectedFile = files[0];
+        displayFileList();
+    }
+});
+
+// Drag and drop
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.style.background = '#e3f2fd';
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.style.background = '';
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.style.background = '';
+    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+    if (files.length > 0) {
+        selectedFile = files[0];
+        // Crear un DataTransfer para asignar el archivo al input
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(selectedFile);
+        fileInput.files = dataTransfer.files;
+        displayFileList();
+    }
+});
+
+// Envío del formulario
 document.getElementById('predictForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const formData = new FormData(this);
-    const resultContainer = document.getElementById('resultContainer');
+    if (!selectedFile) {
+        alert('Por favor, selecciona una imagen primero');
+        return;
+    }
     
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+    // No enviar model_type, la vista usará ambos modelos
+    
+    const resultContainer = document.getElementById('resultContainer');
     resultContainer.innerHTML = '<p class="loading">⏳ Analizando imagen...</p>';
     
     try {
@@ -99,7 +429,7 @@ document.getElementById('predictForm').addEventListener('submit', async function
             method: 'POST',
             body: formData,
             headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                'X-CSRFToken': csrftoken
             }
         });
         
@@ -121,6 +451,9 @@ document.getElementById('predictForm').addEventListener('submit', async function
                 </div>
             `;
             resultContainer.innerHTML = html;
+            
+            // Actualizar tabla de predicciones recientes
+            updatePredictionsTable();
         } else {
             resultContainer.innerHTML = `
                 <div class="result-error">
@@ -138,6 +471,369 @@ document.getElementById('predictForm').addEventListener('submit', async function
         `;
     }
 });
+
+// Función para actualizar la tabla de predicciones recientes
+async function updatePredictionsTable() {
+    try {
+        const response = await fetch('{% url "recent_predictions" %}');
+        const data = await response.json();
+        
+        if (data.success) {
+            const tbody = document.getElementById('predictionsTableBody');
+            
+            if (data.predictions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3">No hay predicciones recientes</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            data.predictions.forEach(pred => {
+                const badgeClass = pred.prediction === 1 ? 'badge-success' : 'badge-danger';
+                html += `
+                    <tr class="prediction-row" data-prediction-id="${pred.id}" data-image-url="${pred.image_url}" data-prediction-label="${pred.prediction_label}" data-confidence="${pred.confidence}" style="cursor: pointer;">
+                        <td>${pred.date}</td>
+                        <td>
+                            <span class="badge ${badgeClass}">
+                                ${pred.prediction_label}
+                            </span>
+                        </td>
+                        <td>${pred.confidence}%</td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+            
+            // Agregar event listeners a las nuevas filas para el modal
+            setupPredictionRowClick();
+        }
+    } catch (error) {
+        console.error('Error al actualizar tabla de predicciones:', error);
+    }
+}
+
+// Función para configurar los event listeners de las filas de predicción
+function setupPredictionRowClick() {
+    const modal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage');
+    const modalPrediction = document.getElementById('modalPrediction');
+    const modalConfidence = document.getElementById('modalConfidence');
+    const closeBtn = document.querySelector('.modal-close');
+    const predictionRows = document.querySelectorAll('.prediction-row');
+    
+    // Abrir modal al hacer clic en una fila
+    predictionRows.forEach(row => {
+        // Remover listeners anteriores si existen
+        const newRow = row.cloneNode(true);
+        row.parentNode.replaceChild(newRow, row);
+        
+        newRow.addEventListener('click', function() {
+            const imageUrl = this.getAttribute('data-image-url');
+            const predictionLabel = this.getAttribute('data-prediction-label');
+            const confidence = this.getAttribute('data-confidence');
+            
+            // Establecer información en el modal
+            modalImage.src = imageUrl;
+            modalPrediction.textContent = predictionLabel;
+            modalPrediction.className = 'prediction-badge ' + (predictionLabel === 'Humano' ? 'badge-success' : 'badge-danger');
+            modalConfidence.textContent = confidence;
+            
+            // Mostrar modal
+            modal.style.display = 'flex';
+            
+            // Manejar error de carga de imagen
+            modalImage.onerror = function() {
+                this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZW4gbm8gZW5jb250cmFkYTwvdGV4dD48L3N2Zz4=';
+                this.alt = 'Imagen no encontrada';
+            };
+        });
+    });
+    
+    // Cerrar modal al hacer clic en la X
+    if (closeBtn) {
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        };
+    }
+    
+    // Cerrar modal al hacer clic fuera del contenido
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    };
+    
+    // Cerrar modal con tecla ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            modal.style.display = 'none';
+        }
+    });
+}
+
+// Inicializar los event listeners cuando se carga la página
+document.addEventListener('DOMContentLoaded', function() {
+    setupPredictionRowClick();
+});
 </script>
+
+<style>
+/* Estilos para el área de subida */
+.upload-wrapper {
+    padding: 0;
+}
+
+.upload-area {
+    border: 3px dashed #667eea;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    background: #f8f9fa;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.upload-area:hover {
+    background: #e3f2fd;
+    border-color: #5568d3;
+}
+
+.file-list {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 6px;
+    border-left: 4px solid #667eea;
+}
+
+.btn-remove {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-remove:hover {
+    background: #c82333;
+}
+
+.upload-controls {
+    text-align: center;
+}
+
+/* Selector de método */
+.method-selector {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.method-btn {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #667eea;
+    background: white;
+    color: #667eea;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.method-btn:hover {
+    background: #f0f4ff;
+}
+
+.method-btn.active {
+    background: #667eea;
+    color: white;
+}
+
+/* Cámara */
+.camera-wrapper {
+    text-align: center;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.camera-wrapper video {
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+.camera-controls {
+    margin-top: 1rem;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-close {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 32px;
+    font-weight: bold;
+    color: #999;
+    cursor: pointer;
+    z-index: 1001;
+    transition: color 0.2s ease;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: #333;
+}
+
+.modal-header {
+    padding: 2rem 2rem 1rem 2rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #667eea;
+    font-size: 1.5rem;
+}
+
+.modal-body {
+    padding: 1.5rem 2rem 2rem 2rem;
+}
+
+.prediction-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.prediction-info p {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.prediction-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.prediction-badge.badge-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.prediction-badge.badge-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.image-container {
+    text-align: center;
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    max-height: 60vh;
+    overflow: auto;
+}
+
+.image-container img {
+    max-width: 100%;
+    max-height: 60vh;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    object-fit: contain;
+}
+
+/* Responsive para modal */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        max-height: 95vh;
+    }
+    
+    .modal-header {
+        padding: 1.5rem 1.5rem 1rem 1.5rem;
+    }
+    
+    .modal-body {
+        padding: 1rem 1.5rem 1.5rem 1.5rem;
+    }
+    
+    .prediction-info {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .image-container {
+        max-height: 50vh;
+    }
+    
+    .image-container img {
+        max-height: 50vh;
+    }
+}
+</style>
 {% endblock %}
 

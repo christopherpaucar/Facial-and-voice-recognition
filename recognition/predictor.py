@@ -69,12 +69,27 @@ class FacePredictor:
         import cv2
         import numpy as np
         
-        # Procesar imagen: intentar detectar rostro, pero si no se detecta, procesar imagen completa
-        # El modelo decidirá si es humano o no basándose en las características de la imagen
+        # Leer imagen para verificar si tiene rostro
+        try:
+            with open(str(image_path), 'rb') as f:
+                image_bytes = f.read()
+            image_array = np.frombuffer(image_bytes, np.uint8)
+            original_image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+            
+            # Intentar detectar rostro primero
+            face_detected = False
+            if original_image is not None:
+                face_coords = self.preprocessor.detect_face(original_image)
+                face_detected = face_coords is not None
+        except Exception:
+            face_detected = False
+        
+        # Procesar imagen: si se detecta rostro, usar detect_face=True, sino procesar imagen completa
+        # Esto es importante porque el modelo puede estar sesgado si procesa imágenes sin rostro como "humanas"
         processed = self.preprocessor.preprocess_for_training(
             image_path,
             apply_filters=True,
-            detect_face=True,  # Intentar detectar rostro primero
+            detect_face=face_detected,  # Solo detectar rostro si realmente hay uno
             remove_bg=False
         )
         
@@ -88,9 +103,26 @@ class FacePredictor:
         
         # Realizar predicción según el modelo
         if self.use_model == 'pca_svm':
-            return self._predict_pca_svm(processed)
+            result = self._predict_pca_svm(processed)
         else:
-            return self._predict_tensorflow(processed)
+            result = self._predict_tensorflow(processed)
+        
+        # Si se detectó un rostro pero el modelo dice "No Humano", 
+        # puede ser un error del modelo - ajustar confianza
+        if face_detected and result['prediction'] == 0:
+            # Si hay rostro detectado, es muy probable que sea humano
+            # Ajustar la predicción pero mantener las probabilidades originales
+            # para que el usuario vea que hay un problema
+            print(f"⚠️ ADVERTENCIA: Se detectó un rostro pero el modelo clasificó como 'No Humano'")
+            print(f"   Probabilidades: Humano={result['probabilities']['humano']:.2%}, No Humano={result['probabilities']['no_humano']:.2%}")
+            # Si la probabilidad de humano es > 0.3, probablemente es un error del modelo
+            if result['probabilities']['humano'] > 0.3:
+                result['prediction'] = 1
+                result['label'] = 'Humano'
+                result['confidence'] = result['probabilities']['humano']
+                result['warning'] = 'Se detectó un rostro - clasificación corregida'
+        
+        return result
     
     def predict_from_array(self, image_array):
         """

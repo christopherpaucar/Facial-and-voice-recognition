@@ -12,5 +12,6 @@ urlpatterns = [
     path('dataset/', views.dataset_view, name='dataset'),
     path('capture/', views.capture_view, name='capture'),
     path('api/upload-dataset/', views.upload_dataset_image, name='upload_dataset'),
+    path('api/recent-predictions/', views.get_recent_predictions, name='recent_predictions'),
 ]
 

@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.utils import timezone
 import os
 import json
 from pathlib import Path
@@ -26,8 +27,9 @@ def train_view(request):
     """Vista para entrenar el modelo"""
     if request.method == 'POST':
         try:
-            use_pca_svm = request.POST.get('use_pca_svm', 'on') == 'on'
-            use_tensorflow = request.POST.get('use_tensorflow', 'on') == 'on'
+            # Siempre entrenar ambos modelos
+            use_pca_svm = True
+            use_tensorflow = True
             
             trainer = ModelTrainer(
                 model_dir=settings.MODEL_DIR,
@@ -94,7 +96,6 @@ def predict_view(request):
                 }, status=400)
             
             image_file = request.FILES['image']
-            model_type = request.POST.get('model_type', 'pca_svm')
             
             # Guardar imagen temporalmente
             upload_dir = settings.MEDIA_ROOT / 'uploads'
@@ -105,13 +106,34 @@ def predict_view(request):
                 for chunk in image_file.chunks():
                     destination.write(chunk)
             
-            # Realizar predicción
-            predictor = FacePredictor(
-                model_dir=settings.MODEL_DIR,
-                use_model=model_type
-            )
+            # Intentar usar ambos modelos, empezando con PCA+SVM, luego TensorFlow si falla
+            result = None
+            model_used = None
             
-            result = predictor.predict_from_image(str(file_path))
+            # Intentar PCA+SVM primero
+            try:
+                predictor = FacePredictor(
+                    model_dir=settings.MODEL_DIR,
+                    use_model='pca_svm'
+                )
+                result = predictor.predict_from_image(str(file_path))
+                model_used = 'pca_svm'
+            except Exception as e:
+                # Si PCA+SVM falla, intentar TensorFlow
+                try:
+                    predictor = FacePredictor(
+                        model_dir=settings.MODEL_DIR,
+                        use_model='tensorflow'
+                    )
+                    result = predictor.predict_from_image(str(file_path))
+                    model_used = 'tensorflow'
+                except Exception as e2:
+                    # Si ambos fallan, lanzar el error más reciente
+                    raise e2
+            
+            # Si no se pudo obtener resultado, lanzar error
+            if result is None:
+                raise Exception('No se pudo realizar la predicción con ningún modelo disponible')
             
             # Guardar predicción en BD
             if result.get('prediction') is not None:
@@ -141,9 +163,33 @@ def predict_view(request):
             }, status=500)
     
     # GET: Mostrar página de predicción
-    recent_predictions = Prediction.objects.all()[:10]
+    recent_predictions = Prediction.objects.all().order_by('-created_at')[:10]
     return render(request, 'recognition/predict.html', {
         'recent_predictions': recent_predictions
+    })
+
+
+def get_recent_predictions(request):
+    """API para obtener las predicciones recientes en formato JSON"""
+    # Ordenar explícitamente por fecha descendente (más recientes primero)
+    predictions = Prediction.objects.all().order_by('-created_at')[:10]
+    
+    predictions_data = []
+    for pred in predictions:
+        # Convertir a zona horaria local antes de formatear
+        local_time = timezone.localtime(pred.created_at)
+        predictions_data.append({
+            'id': pred.id,
+            'date': local_time.strftime('%d/%m/%Y %H:%M'),
+            'prediction': pred.prediction,
+            'prediction_label': pred.get_prediction_display(),
+            'confidence': f"{pred.confidence:.2f}",
+            'image_url': pred.get_image_url()
+        })
+    
+    return JsonResponse({
+        'success': True,
+        'predictions': predictions_data
     })
 
 

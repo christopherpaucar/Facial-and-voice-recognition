@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema de Reconocimiento de Rostros{% endblock %}</title>
     {% load static %}
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
@@ -13,12 +14,12 @@
         <div class="container">
             <h1 class="navbar-brand">🤖 Sistema de Reconocimiento de Rostros</h1>
             <ul class="navbar-nav">
-                <li><a href="{% url 'index' %}">Inicio</a></li>
-                <li><a href="{% url 'predict' %}">Probar Modelo</a></li>
-                <li><a href="{% url 'train' %}">Entrenar</a></li>
-                <li><a href="{% url 'dataset' %}">Dataset</a></li>
-                <li><a href="{% url 'capture' %}">📸 Capturar</a></li>
-                <li><a href="{% url 'history' %}">Historial</a></li>
+                <li><a href="{% url 'index' %}">Inicio<span class="nav-icon">🏠</span></a></li>
+                <li><a href="{% url 'predict' %}">Probar Modelo<span class="nav-icon">🔍</span></a></li>
+                <li><a href="{% url 'train' %}">Entrenar<span class="nav-icon">🚀</span></a></li>
+                <li><a href="{% url 'dataset' %}">Dataset<span class="nav-icon">📁</span></a></li>
+                <li><a href="{% url 'capture' %}">Capturar<span class="nav-icon">📸</span></a></li>
+                <li><a href="{% url 'history' %}">Historial<span class="nav-icon">📊</span></a></li>
             </ul>
         </div>
     </nav>
