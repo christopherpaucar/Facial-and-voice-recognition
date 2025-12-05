@@ -61,7 +61,12 @@ def train_view(request):
             return JsonResponse({
                 'success': True,
                 'results': results,
-                'message': 'Modelo entrenado exitosamente'
+                'message': 'Modelo entrenado exitosamente',
+                'stats': {
+                    'total_samples': total_samples,
+                    'human_samples': human_samples,
+                    'non_human_samples': non_human_samples
+                }
             })
         except Exception as e:
             return JsonResponse({
@@ -168,6 +173,65 @@ def dataset_view(request):
     })
 
 
+def _generate_unique_filename(target_dir, original_filename):
+    """
+    Genera un nombre de archivo único para evitar sobrescribir archivos existentes.
+    
+    Args:
+        target_dir: Directorio donde se guardará el archivo
+        original_filename: Nombre original del archivo
+    
+    Returns:
+        str: Nombre de archivo único
+    """
+    import datetime
+    from pathlib import Path
+    
+    # Si no hay nombre original o es captura de cámara, generar nombre único
+    if not original_filename or original_filename.startswith('capture_'):
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        filename = f'capture_{timestamp}.jpg'
+        file_path = target_dir / filename
+        # Si por alguna razón existe, agregar más precisión al timestamp
+        if file_path.exists():
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            filename = f'capture_{timestamp}.jpg'
+        return filename
+    
+    # Separar nombre y extensión
+    path_obj = Path(original_filename)
+    name_without_ext = path_obj.stem  # Nombre sin extensión
+    extension = path_obj.suffix or '.jpg'  # Extensión (incluye el punto)
+    
+    # Verificar si el archivo ya existe
+    file_path = target_dir / original_filename
+    if not file_path.exists():
+        # Si no existe, usar el nombre original
+        return original_filename
+    
+    # Si existe, generar nombre único agregando timestamp o contador
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    counter = 1
+    
+    # Intentar con timestamp primero
+    new_filename = f"{name_without_ext}_{timestamp}{extension}"
+    file_path = target_dir / new_filename
+    
+    # Si aún existe, usar contador
+    while file_path.exists():
+        new_filename = f"{name_without_ext}_{timestamp}_{counter}{extension}"
+        file_path = target_dir / new_filename
+        counter += 1
+        # Limitar intentos para evitar loops infinitos
+        if counter > 1000:
+            # Si hay demasiados archivos, usar timestamp más preciso
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            new_filename = f"{name_without_ext}_{timestamp}{extension}"
+            break
+    
+    return new_filename
+
+
 @csrf_exempt
 def upload_dataset_image(request):
     """Vista para subir imágenes al dataset"""
@@ -186,13 +250,8 @@ def upload_dataset_image(request):
             target_dir = settings.DATASET_DIR / label
             target_dir.mkdir(parents=True, exist_ok=True)
             
-            # Generar nombre único si no viene nombre o si es captura de cámara
-            if not image_file.name or image_file.name.startswith('capture_'):
-                import datetime
-                timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-                filename = f'capture_{timestamp}.jpg'
-            else:
-                filename = image_file.name
+            # Generar nombre único que no sobrescriba archivos existentes
+            filename = _generate_unique_filename(target_dir, image_file.name)
             
             # Guardar imagen
             file_path = target_dir / filename
@@ -203,7 +262,8 @@ def upload_dataset_image(request):
             return JsonResponse({
                 'success': True,
                 'message': f'Imagen guardada en {label}',
-                'path': str(file_path)
+                'path': str(file_path),
+                'filename': filename
             })
             
         except Exception as e:

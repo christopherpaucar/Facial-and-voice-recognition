@@ -20,7 +20,7 @@
         </thead>
         <tbody>
             {% for pred in predictions %}
-            <tr>
+            <tr class="prediction-row" data-prediction-id="{{ pred.id }}" data-image-url="{{ pred.get_image_url }}" data-prediction-label="{% if pred.prediction == 1 %}Humano{% else %}No Humano{% endif %}" data-confidence="{{ pred.confidence|floatformat:2 }}" style="cursor: pointer;">
                 <td>{{ pred.created_at|date:"d/m/Y H:i" }}</td>
                 <td>
                     <span class="badge {% if pred.prediction == 1 %}badge-success{% else %}badge-danger{% endif %}">
@@ -69,5 +69,245 @@
         </tbody>
     </table>
 </div>
+
+<!-- Modal para mostrar la imagen -->
+<div id="imageModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div class="modal-header">
+            <h3>📸 Imagen de la Predicción</h3>
+        </div>
+        <div class="modal-body">
+            <div class="prediction-info">
+                <p><strong>Predicción:</strong> <span id="modalPrediction" class="prediction-badge"></span></p>
+                <p><strong>Confianza:</strong> <span id="modalConfidence"></span>%</p>
+            </div>
+            <div class="image-container">
+                <img id="modalImage" src="" alt="Imagen de predicción" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage');
+    const modalPrediction = document.getElementById('modalPrediction');
+    const modalConfidence = document.getElementById('modalConfidence');
+    const closeBtn = document.querySelector('.modal-close');
+    const predictionRows = document.querySelectorAll('.prediction-row');
+    
+    // Abrir modal al hacer clic en una fila
+    predictionRows.forEach(row => {
+        row.addEventListener('click', function() {
+            const imageUrl = this.getAttribute('data-image-url');
+            const predictionLabel = this.getAttribute('data-prediction-label');
+            const confidence = this.getAttribute('data-confidence');
+            
+            // Establecer información en el modal
+            modalImage.src = imageUrl;
+            modalPrediction.textContent = predictionLabel;
+            modalPrediction.className = 'prediction-badge ' + (predictionLabel === 'Humano' ? 'badge-success' : 'badge-danger');
+            modalConfidence.textContent = confidence;
+            
+            // Mostrar modal
+            modal.style.display = 'flex';
+            
+            // Manejar error de carga de imagen
+            modalImage.onerror = function() {
+                this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5JbWFnZW4gbm8gZW5jb250cmFkYTwvdGV4dD48L3N2Zz4=';
+                this.alt = 'Imagen no encontrada';
+            };
+        });
+    });
+    
+    // Cerrar modal al hacer clic en la X
+    closeBtn.addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+    
+    // Cerrar modal al hacer clic fuera del contenido
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+    
+    // Cerrar modal con tecla ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            modal.style.display = 'none';
+        }
+    });
+});
+</script>
+
+<style>
+/* Estilos para filas clickeables */
+.prediction-row {
+    transition: background-color 0.2s ease;
+}
+
+.prediction-row:hover {
+    background-color: #f0f0f0 !important;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-close {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 32px;
+    font-weight: bold;
+    color: #999;
+    cursor: pointer;
+    z-index: 1001;
+    transition: color 0.2s ease;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: #333;
+}
+
+.modal-header {
+    padding: 2rem 2rem 1rem 2rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #667eea;
+    font-size: 1.5rem;
+}
+
+.modal-body {
+    padding: 1.5rem 2rem 2rem 2rem;
+}
+
+.prediction-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.prediction-info p {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.prediction-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.prediction-badge.badge-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.prediction-badge.badge-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.image-container {
+    text-align: center;
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    max-height: 60vh;
+    overflow: auto;
+}
+
+.image-container img {
+    max-width: 100%;
+    max-height: 60vh;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    object-fit: contain;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        max-height: 95vh;
+    }
+    
+    .modal-header {
+        padding: 1.5rem 1.5rem 1rem 1.5rem;
+    }
+    
+    .modal-body {
+        padding: 1rem 1.5rem 1.5rem 1.5rem;
+    }
+    
+    .prediction-info {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .image-container {
+        max-height: 50vh;
+    }
+    
+    .image-container img {
+        max-height: 50vh;
+    }
+}
+</style>
 {% endblock %}
 

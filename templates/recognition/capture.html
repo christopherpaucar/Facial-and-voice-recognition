@@ -90,7 +90,7 @@
                 <div class="form-group" id="delayGroup">
                     <label for="delay">Delay entre fotos (ms):</label>
                     <input type="number" id="delay" class="form-control" value="300" min="100" max="5000" step="50">
-                    <small style="color: #666; font-size: 0.9rem; display: block; margin-top: 0.25rem;">300ms = ~3 fotos por segundo (recomendado)</small>
+                    <small id="delayInfo" style="color: #666; font-size: 0.9rem; display: block; margin-top: 0.25rem;">300ms = ~3.3 fotos por segundo</small>
                 </div>
             </div>
         </div>
@@ -133,6 +133,18 @@ function updateCaptureButtonText() {
     const btnCapture = document.getElementById('startCapture');
     if (btnCapture) {
         btnCapture.textContent = `📸 Iniciar Captura de ${photoCount} Fotos`;
+    }
+}
+
+// Función para actualizar la información del delay
+function updateDelayInfo() {
+    const delay = parseInt(document.getElementById('delay').value) || 300;
+    const delayInfo = document.getElementById('delayInfo');
+    
+    if (delayInfo) {
+        // Calcular fotos por segundo: 1000ms / delay = fotos/segundo
+        const photosPerSecond = (1000 / delay).toFixed(1);
+        delayInfo.textContent = `${delay}ms = ~${photosPerSecond} fotos por segundo`;
     }
 }
 
@@ -219,6 +231,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Actualizar texto del botón inicialmente
     updateCaptureButtonText();
     
+    // Actualizar información del delay inicialmente
+    updateDelayInfo();
+    
     // Actualizar texto del botón cuando cambie el número de fotos
     document.getElementById('photoCount').addEventListener('input', () => {
         updateCaptureButtonText();
@@ -226,6 +241,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('photoCount').addEventListener('change', () => {
         updateCaptureButtonText();
+    });
+    
+    // Actualizar información del delay cuando cambie
+    document.getElementById('delay').addEventListener('input', () => {
+        updateDelayInfo();
+    });
+    
+    document.getElementById('delay').addEventListener('change', () => {
+        updateDelayInfo();
     });
     
     // Activar cámara automáticamente al cargar (modo cámara por defecto)

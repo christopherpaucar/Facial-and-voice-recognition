@@ -75,8 +75,59 @@ document.getElementById('trainForm').addEventListener('submit', async function(e
     
     const formData = new FormData(this);
     const statusContainer = document.getElementById('trainStatus');
+    const submitButton = this.querySelector('button[type="submit"]');
+    const startTime = Date.now();
     
-    statusContainer.innerHTML = '<p class="loading">⏳ Iniciando entrenamiento... Esto puede tardar varios minutos.</p>';
+    // Deshabilitar botón y mostrar estado inicial
+    submitButton.disabled = true;
+    submitButton.textContent = '⏳ Entrenando...';
+    
+    // Mostrar información detallada del proceso
+    let statusHTML = `
+        <div class="training-progress">
+            <div class="progress-header">
+                <h3>⏳ Entrenamiento en Progreso</h3>
+                <div class="spinner"></div>
+            </div>
+            <div class="progress-steps">
+                <div class="step active">
+                    <span class="step-icon">📁</span>
+                    <span class="step-text">Cargando dataset...</span>
+                </div>
+                <div class="step">
+                    <span class="step-icon">🔍</span>
+                    <span class="step-text">Procesando imágenes...</span>
+                </div>
+                <div class="step">
+                    <span class="step-icon">🧠</span>
+                    <span class="step-text">Entrenando modelos...</span>
+                </div>
+                <div class="step">
+                    <span class="step-icon">💾</span>
+                    <span class="step-text">Guardando modelos...</span>
+                </div>
+            </div>
+            <div class="progress-info">
+                <p><strong>⏱️ Tiempo transcurrido:</strong> <span id="elapsedTime">0 segundos</span></p>
+                <p style="color: #666; margin-top: 0.5rem;">Este proceso puede tardar varios minutos dependiendo del tamaño del dataset.</p>
+                <p style="color: #666;">Por favor, no cierres esta página.</p>
+            </div>
+        </div>
+    `;
+    statusContainer.innerHTML = statusHTML;
+    
+    // Actualizar tiempo transcurrido
+    const timeInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const timeElement = document.getElementById('elapsedTime');
+        if (timeElement) {
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            timeElement.textContent = minutes > 0 
+                ? `${minutes} minuto${minutes > 1 ? 's' : ''} ${seconds} segundo${seconds !== 1 ? 's' : ''}`
+                : `${seconds} segundo${seconds !== 1 ? 's' : ''}`;
+        }
+    }, 1000);
     
     try {
         const response = await fetch('{% url "train" %}', {
@@ -87,41 +138,406 @@ document.getElementById('trainForm').addEventListener('submit', async function(e
             }
         });
         
+        clearInterval(timeInterval);
         const data = await response.json();
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        const elapsedText = minutes > 0 
+            ? `${minutes} minuto${minutes > 1 ? 's' : ''} ${seconds} segundo${seconds !== 1 ? 's' : ''}`
+            : `${seconds} segundo${seconds !== 1 ? 's' : ''}`;
         
         if (data.success) {
-            let html = '<div class="result-success"><h3>✅ Entrenamiento Completado</h3>';
-            html += '<p><strong>Resultados:</strong></p><ul>';
+            let html = `
+                <div class="result-success">
+                    <div class="result-header">
+                        <h3>✅ Entrenamiento Completado Exitosamente</h3>
+                        <p class="elapsed-time">⏱️ Tiempo total: ${elapsedText}</p>
+                    </div>
+                    <div class="result-content">
+                        <div class="results-section">
+                            <h4>📊 Resultados de los Modelos</h4>
+                            <div class="results-grid">
+            `;
             
             if (data.results.pca_svm) {
-                html += `<li>PCA + SVM Accuracy: ${(data.results.pca_svm * 100).toFixed(2)}%</li>`;
-            }
-            if (data.results.tensorflow) {
-                html += `<li>TensorFlow Accuracy: ${(data.results.tensorflow * 100).toFixed(2)}%</li>`;
+                const accuracy = (data.results.pca_svm * 100).toFixed(2);
+                html += `
+                    <div class="result-card">
+                        <div class="result-icon">🤖</div>
+                        <div class="result-info">
+                            <h5>PCA + SVM</h5>
+                            <p class="accuracy">Accuracy: <strong>${accuracy}%</strong></p>
+                        </div>
+                    </div>
+                `;
             }
             
-            html += '</ul></div>';
+            if (data.results.tensorflow) {
+                const accuracy = (data.results.tensorflow * 100).toFixed(2);
+                html += `
+                    <div class="result-card">
+                        <div class="result-icon">🧠</div>
+                        <div class="result-info">
+                            <h5>TensorFlow CNN</h5>
+                            <p class="accuracy">Accuracy: <strong>${accuracy}%</strong></p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `
+                            </div>
+                        </div>
+                        ${data.stats ? `
+                        <div class="stats-section">
+                            <h4>📈 Estadísticas del Dataset</h4>
+                            <ul class="stats-list">
+                                <li><strong>Total de muestras:</strong> ${data.stats.total_samples}</li>
+                                <li><strong>Humanos:</strong> ${data.stats.human_samples}</li>
+                                <li><strong>No humanos:</strong> ${data.stats.non_human_samples}</li>
+                            </ul>
+                        </div>
+                        ` : ''}
+                        <div class="success-message">
+                            <p>🎉 Los modelos han sido entrenados y guardados correctamente.</p>
+                            <p>Ahora puedes usar la página de <strong>Reconocimiento</strong> para probar los modelos.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
             statusContainer.innerHTML = html;
             
-            // Recargar página después de 3 segundos para ver el historial actualizado
-            setTimeout(() => location.reload(), 3000);
+            // Recargar página después de 5 segundos para ver el historial actualizado
+            setTimeout(() => {
+                location.reload();
+            }, 5000);
         } else {
             statusContainer.innerHTML = `
                 <div class="result-error">
-                    <h3>❌ Error</h3>
-                    <p>${data.error || 'Ocurrió un error durante el entrenamiento'}</p>
+                    <div class="error-header">
+                        <h3>❌ Error en el Entrenamiento</h3>
+                        <p class="elapsed-time">⏱️ Tiempo transcurrido: ${elapsedText}</p>
+                    </div>
+                    <div class="error-content">
+                        <p><strong>Descripción del error:</strong></p>
+                        <pre class="error-message">${data.error || 'Ocurrió un error durante el entrenamiento'}</pre>
+                        <div class="error-suggestions">
+                            <h4>💡 Sugerencias:</h4>
+                            <ul>
+                                <li>Verifica que tengas imágenes en ambas carpetas: <code>dataset/human/</code> y <code>dataset/non_human/</code></li>
+                                <li>Asegúrate de que las imágenes sean válidas (JPG, PNG, JPEG)</li>
+                                <li>Revisa que tengas al menos 10 imágenes en total</li>
+                                <li>Verifica los logs del servidor para más detalles</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             `;
         }
     } catch (error) {
+        clearInterval(timeInterval);
         statusContainer.innerHTML = `
             <div class="result-error">
-                <h3>❌ Error</h3>
-                <p>${error.message}</p>
+                <div class="error-header">
+                    <h3>❌ Error de Conexión</h3>
+                </div>
+                <div class="error-content">
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Por favor, verifica tu conexión e intenta nuevamente.</p>
+                </div>
             </div>
         `;
+    } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = '🚀 Iniciar Entrenamiento';
     }
 });
 </script>
+
+<style>
+/* Estado del entrenamiento */
+.train-status {
+    min-height: 200px;
+    padding: 1.5rem;
+}
+
+.train-status .placeholder {
+    text-align: center;
+    color: #999;
+    font-style: italic;
+    padding: 2rem;
+}
+
+/* Progreso del entrenamiento */
+.training-progress {
+    padding: 1.5rem;
+}
+
+.progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+}
+
+.progress-header h3 {
+    margin: 0;
+    color: #667eea;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.progress-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #ddd;
+    transition: all 0.3s;
+}
+
+.step.active {
+    background: #e3f2fd;
+    border-left-color: #667eea;
+}
+
+.step-icon {
+    font-size: 1.5rem;
+}
+
+.step-text {
+    font-weight: 500;
+    color: #333;
+}
+
+.progress-info {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.progress-info p {
+    margin: 0.5rem 0;
+}
+
+/* Resultados exitosos */
+.result-success {
+    background: #d4edda;
+    border: 2px solid #c3e6cb;
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+.result-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid #c3e6cb;
+}
+
+.result-header h3 {
+    color: #155724;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+}
+
+.elapsed-time {
+    color: #155724;
+    font-size: 1rem;
+    margin: 0;
+}
+
+.result-content {
+    margin-top: 1.5rem;
+}
+
+.results-section {
+    margin-bottom: 2rem;
+}
+
+.results-section h4 {
+    color: #155724;
+    margin-bottom: 1rem;
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.result-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.result-icon {
+    font-size: 2.5rem;
+}
+
+.result-info h5 {
+    margin: 0 0 0.5rem 0;
+    color: #333;
+}
+
+.result-info .accuracy {
+    margin: 0;
+    color: #155724;
+    font-size: 1.1rem;
+}
+
+.stats-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.stats-section h4 {
+    color: #155724;
+    margin-bottom: 1rem;
+}
+
+.stats-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.stats-list li {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.stats-list li:last-child {
+    border-bottom: none;
+}
+
+.success-message {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.success-message p {
+    margin: 0.5rem 0;
+    color: #155724;
+}
+
+/* Errores */
+.result-error {
+    background: #f8d7da;
+    border: 2px solid #f5c6cb;
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+.error-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid #f5c6cb;
+}
+
+.error-header h3 {
+    color: #721c24;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+}
+
+.error-content {
+    margin-top: 1.5rem;
+}
+
+.error-message {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid #dc3545;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: #721c24;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.error-suggestions {
+    margin-top: 1.5rem;
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+}
+
+.error-suggestions h4 {
+    color: #721c24;
+    margin-bottom: 1rem;
+}
+
+.error-suggestions ul {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.error-suggestions li {
+    margin: 0.75rem 0;
+    color: #333;
+}
+
+.error-suggestions code {
+    background: #f8f9fa;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .results-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .progress-steps {
+        gap: 0.75rem;
+    }
+    
+    .result-success,
+    .result-error {
+        padding: 1.5rem;
+    }
+}
+</style>
 {% endblock %}
 
